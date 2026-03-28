@@ -6,19 +6,17 @@ import (
 	"strconv"
 	"testing"
 
-	gofilewatch "go.ofkm.dev/filewatch"
+	gofilewatch "go.ofkm.dev/gaze"
 )
 
 func BenchmarkWatchDirectoryCreateRemove(b *testing.B) {
 	root := b.TempDir()
-	w, err := gofilewatch.WatchDirectory(
-		root,
-		func(cfg *gofilewatch.Config) {
-			cfg.Logger = nil
-			cfg.OnEvent = func(gofilewatch.Event) {}
-			cfg.OnError = func(error) {}
-		},
-	)
+	cfg := gofilewatch.Config{
+		OnEvent: func(gofilewatch.Event) {},
+		OnError: func(error) {},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		b.Fatalf("WatchDirectory() error = %v", err)
 	}

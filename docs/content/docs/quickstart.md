@@ -7,10 +7,46 @@ weight: 1
 ## Install
 
 ```bash
-go get go.ofkm.dev/filewatch
+go get go.ofkm.dev/gaze
 ```
 
-## Minimal callback-based watch
+## Simplest watch
+
+This is the lowest-friction path. The package owns the watcher goroutines and logs normalized events and internal errors with `slog.Default()`.
+
+```go
+package main
+
+import (
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
+	gofilewatch "go.ofkm.dev/gaze"
+)
+
+func main() {
+	w, err := gofilewatch.WatchDirectory("my-directory")
+	if err != nil {
+		slog.Default().Error("watch directory", "path", "my-directory", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := w.Close(); err != nil {
+			slog.Default().Error("close watcher", "err", err)
+		}
+	}()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	<-sig
+}
+```
+
+## Structured config
+
+When you need filters, callbacks, or logger control, use a plain struct literal with `WatchDirectoryWithConfig`.
 
 ```go
 package main
@@ -22,73 +58,93 @@ import (
 	"os/signal"
 	"syscall"
 
-	gofilewatch "go.ofkm.dev/filewatch"
+	gofilewatch "go.ofkm.dev/gaze"
 )
 
 func main() {
 	logger := slog.Default()
-	sig := make(chan os.Signal, 1)
-
-	w, err := gofilewatch.WatchDirectory(
-		"my-directory",
-		func(cfg *gofilewatch.Config) {
-			cfg.OnEvent = func(evt gofilewatch.Event) {
-				fmt.Printf("%s %s\n", evt.Op, evt.Path)
-			}
-			cfg.OnError = func(err error) {
-				logger.Error("watcher error", "err", err)
-			}
+	cfg := gofilewatch.Config{
+		ExcludeGlobs: []string{"*.tmp", "*.swp", ".DS_Store"},
+		OnEvent: func(evt gofilewatch.Event) {
+			fmt.Printf("%s %s\n", evt.Op, evt.Path)
 		},
-	)
+		OnError: func(err error) {
+			logger.Error("watcher error", "err", err)
+		},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
 	if err != nil {
 		logger.Error("watch directory", "path", "my-directory", "err", err)
 		os.Exit(1)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			logger.Error("close watcher", "err", err)
+		}
+	}()
 
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 }
 ```
 
-## Minimal single-file watch
+## Watch a single file
 
 ```go
-w, err := gofilewatch.WatchFile("config.yaml")
-```
-
-`WatchFile` watches the file's parent directory and filters events so only the target file is emitted.
-
-## Make recursion explicit
-
-```go
-w, err := gofilewatch.WatchDirectory(
-	"/srv/app",
-	func(cfg *gofilewatch.Config) {
-		cfg.Recursive = false
-		cfg.OnEvent = func(evt gofilewatch.Event) {
-			fmt.Println(evt.Op, evt.Path)
-		}
+cfg := gofilewatch.Config{
+	OnEvent: func(evt gofilewatch.Event) {
+		fmt.Println(evt.Op, evt.Path)
 	},
-)
+}
+
+w, err := gofilewatch.WatchFileWithConfig("config.yaml", cfg)
+if err != nil {
+	panic(err)
+}
+defer func() {
+	if err := w.Close(); err != nil {
+		panic(err)
+	}
+}()
 ```
 
-`WatchDirectory` is recursive by default. Set `cfg.Recursive = false` in the configure callback when you want only the root directory level.
+`WatchFile` and `WatchFileWithConfig` watch the file's parent directory and emit only events for the target file.
 
-## Install path and follow-symlink behavior
+## Disable recursion explicitly
+
+`WatchDirectory` is recursive by default. To watch only the top-level directory, set `Recursion: gofilewatch.RecursionDisabled`.
 
 ```go
-w, err := gofilewatch.WatchDirectory(
-	"./relative/path",
-	func(cfg *gofilewatch.Config) {
-		cfg.FollowSymlinks = true
+cfg := gofilewatch.Config{
+	Recursion: gofilewatch.RecursionDisabled,
+	OnEvent: func(evt gofilewatch.Event) {
+		fmt.Println(evt.Op, evt.Path)
 	},
-)
+}
+
+w, err := gofilewatch.WatchDirectoryWithConfig("/srv/app", cfg)
+if err != nil {
+	panic(err)
+}
 ```
 
-- by default, symlink roots are rejected unless `cfg.FollowSymlinks = true` is set
-- non-symlink roots are accepted either way
+## Follow symlinks intentionally
 
-## Logging fallback when no handlers are set
+Symlink roots are rejected unless you opt in.
 
-If you do not provide `Config.OnEvent` or `Config.OnError`, the package logs all normalized events and errors using the configured `slog.Logger` (default: `slog.Default()`).
+```go
+cfg := gofilewatch.Config{
+	FollowSymlinks: true,
+}
+
+w, err := gofilewatch.WatchDirectoryWithConfig("./relative/path", cfg)
+if err != nil {
+	panic(err)
+}
+```
+
+## Logging fallback
+
+If you omit `Config.OnEvent` and `Config.OnError`, Gaze logs normalized events and runtime errors with `Config.Logger`. If `Config.Logger` is nil, the package uses `slog.Default()`.

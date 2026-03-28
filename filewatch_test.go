@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	gofilewatch "go.ofkm.dev/filewatch"
+	gofilewatch "go.ofkm.dev/gaze"
 )
 
 func TestWatchDirectoryLifecycle(t *testing.T) {
@@ -17,18 +17,16 @@ func TestWatchDirectoryLifecycle(t *testing.T) {
 	root := t.TempDir()
 	events := make(chan gofilewatch.Event, 32)
 	errs := make(chan error, 32)
-
-	w, err := gofilewatch.WatchDirectory(
-		root,
-		func(cfg *gofilewatch.Config) {
-			cfg.OnEvent = func(evt gofilewatch.Event) {
-				events <- evt
-			}
-			cfg.OnError = func(err error) {
-				errs <- err
-			}
+	cfg := gofilewatch.Config{
+		OnEvent: func(evt gofilewatch.Event) {
+			events <- evt
 		},
-	)
+		OnError: func(err error) {
+			errs <- err
+		},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -67,19 +65,17 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 	root := t.TempDir()
 	events := make(chan gofilewatch.Event, 32)
 	errs := make(chan error, 32)
-
-	w, err := gofilewatch.WatchDirectory(
-		root,
-		func(cfg *gofilewatch.Config) {
-			cfg.ExcludeGlobs = []string{"*.tmp"}
-			cfg.OnEvent = func(evt gofilewatch.Event) {
-				events <- evt
-			}
-			cfg.OnError = func(err error) {
-				errs <- err
-			}
+	cfg := gofilewatch.Config{
+		ExcludeGlobs: []string{"*.tmp"},
+		OnEvent: func(evt gofilewatch.Event) {
+			events <- evt
 		},
-	)
+		OnError: func(err error) {
+			errs <- err
+		},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -114,6 +110,49 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 	})
 }
 
+func TestWatchDirectoryNonRecursive(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	events := make(chan gofilewatch.Event, 32)
+	errs := make(chan error, 32)
+	cfg := gofilewatch.Config{
+		Recursion: gofilewatch.RecursionDisabled,
+		OnEvent: func(evt gofilewatch.Event) {
+			events <- evt
+		},
+		OnError: func(err error) {
+			errs <- err
+		},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	if err != nil {
+		t.Fatalf("WatchDirectoryWithConfig() error = %v", err)
+	}
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+	}()
+
+	subdir := filepath.Join(root, "nested")
+	if err := os.Mkdir(subdir, 0o755); err != nil {
+		t.Fatalf("Mkdir() error = %v", err)
+	}
+	waitForEvent(t, events, errs, func(evt gofilewatch.Event) bool {
+		return evt.Path == subdir && evt.IsDir && evt.Op.Has(gofilewatch.OpCreate)
+	})
+
+	nested := filepath.Join(subdir, "child.txt")
+	if err := os.WriteFile(nested, []byte("hello"), 0o644); err != nil {
+		t.Fatalf("WriteFile(nested) error = %v", err)
+	}
+	assertNoEvent(t, events, errs, func(evt gofilewatch.Event) bool {
+		return evt.Path == nested
+	})
+}
+
 func TestWatchDirectoryOnEvent(t *testing.T) {
 	t.Parallel()
 
@@ -121,18 +160,16 @@ func TestWatchDirectoryOnEvent(t *testing.T) {
 
 	received := make(chan gofilewatch.Event, 8)
 	errs := make(chan error, 8)
-
-	w, err := gofilewatch.WatchDirectory(
-		root,
-		func(cfg *gofilewatch.Config) {
-			cfg.OnEvent = func(evt gofilewatch.Event) {
-				received <- evt
-			}
-			cfg.OnError = func(err error) {
-				errs <- err
-			}
+	cfg := gofilewatch.Config{
+		OnEvent: func(evt gofilewatch.Event) {
+			received <- evt
 		},
-	)
+		OnError: func(err error) {
+			errs <- err
+		},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -174,20 +211,18 @@ func TestWatchDirectoryOnEventPanicBecomesError(t *testing.T) {
 
 	var once sync.Once
 	errs := make(chan error, 8)
-
-	w, err := gofilewatch.WatchDirectory(
-		root,
-		func(cfg *gofilewatch.Config) {
-			cfg.OnEvent = func(gofilewatch.Event) {
-				once.Do(func() {
-					panic("boom")
-				})
-			}
-			cfg.OnError = func(err error) {
-				errs <- err
-			}
+	cfg := gofilewatch.Config{
+		OnEvent: func(gofilewatch.Event) {
+			once.Do(func() {
+				panic("boom")
+			})
 		},
-	)
+		OnError: func(err error) {
+			errs <- err
+		},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}

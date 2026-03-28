@@ -1,6 +1,6 @@
 ---
 title: "Documentation"
-description: "Install, configure, and ship filewatch without CGO."
+description: "Install, configure, and ship Gaze without CGO."
 weight: 1
 toc: false
 ---

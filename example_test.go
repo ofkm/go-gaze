@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	gofilewatch "go.ofkm.dev/filewatch"
+	gofilewatch "go.ofkm.dev/gaze"
 )
 
 func ExampleWatchDirectory() {
-	root, err := os.MkdirTemp("", "filewatch-example-*")
+	root, err := os.MkdirTemp("", "gaze-example-*")
 	if err != nil {
 		panic(err)
 	}
@@ -17,24 +17,24 @@ func ExampleWatchDirectory() {
 	}()
 
 	events := make(chan gofilewatch.Event, 1)
-
-	w, err := gofilewatch.WatchDirectory(
-		root,
-		func(cfg *gofilewatch.Config) {
-			cfg.ExcludeGlobs = []string{"*.tmp"}
-			cfg.OnEvent = func(evt gofilewatch.Event) {
-				select {
-				case events <- evt:
-				default:
-				}
+	cfg := gofilewatch.Config{
+		ExcludeGlobs: []string{"*.tmp"},
+		OnEvent: func(evt gofilewatch.Event) {
+			select {
+			case events <- evt:
+			default:
 			}
 		},
-	)
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		_ = w.Close()
+		if err := w.Close(); err != nil {
+			panic(err)
+		}
 	}()
 
 	select {

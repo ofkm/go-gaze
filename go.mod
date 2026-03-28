@@ -1,4 +1,4 @@
-module go.ofkm.dev/filewatch
+module go.ofkm.dev/gaze
 
 go 1.26.1
 

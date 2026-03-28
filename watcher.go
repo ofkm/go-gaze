@@ -9,10 +9,10 @@ import (
 	"strings"
 	"sync"
 
-	"go.ofkm.dev/filewatch/internal/backend"
-	"go.ofkm.dev/filewatch/internal/filter"
-	"go.ofkm.dev/filewatch/internal/queue"
-	"go.ofkm.dev/filewatch/internal/tree"
+	"go.ofkm.dev/gaze/internal/backend"
+	"go.ofkm.dev/gaze/internal/filter"
+	"go.ofkm.dev/gaze/internal/queue"
+	"go.ofkm.dev/gaze/internal/tree"
 )
 
 type Watcher struct {
@@ -28,38 +28,51 @@ type Watcher struct {
 	done      chan struct{}
 }
 
-func WatchDirectory(path string, configure ...Configure) (*Watcher, error) {
-	w, err := New(configure...)
+func WatchDirectory(path string) (*Watcher, error) {
+	return WatchDirectoryWithConfig(path, Config{})
+}
+
+func WatchDirectoryWithConfig(path string, cfg Config) (*Watcher, error) {
+	w, err := NewWithConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 	if err := w.Add(path); err != nil {
-		_ = w.Close()
+		if closeErr := w.Close(); closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
 		return nil, err
 	}
 	return w, nil
 }
 
-func WatchFile(path string, configure ...Configure) (*Watcher, error) {
-	cfg := defaultConfig()
-	applyConfig(&cfg, configure)
-	cfg.Recursive = false
+func WatchFile(path string) (*Watcher, error) {
+	return WatchFileWithConfig(path, Config{})
+}
+
+func WatchFileWithConfig(path string, cfg Config) (*Watcher, error) {
+	cfg = resolveConfig(cfg)
+	cfg.Recursion = RecursionDisabled
 
 	w, err := newWatcher(cfg)
 	if err != nil {
 		return nil, err
 	}
 	if err := w.Add(path); err != nil {
-		_ = w.Close()
+		if closeErr := w.Close(); closeErr != nil {
+			return nil, errors.Join(err, closeErr)
+		}
 		return nil, err
 	}
 	return w, nil
 }
 
-func New(configure ...Configure) (*Watcher, error) {
-	cfg := defaultConfig()
-	applyConfig(&cfg, configure)
-	return newWatcher(cfg)
+func New() (*Watcher, error) {
+	return NewWithConfig(Config{})
+}
+
+func NewWithConfig(cfg Config) (*Watcher, error) {
+	return newWatcher(resolveConfig(cfg))
 }
 
 func newWatcher(cfg Config) (*Watcher, error) {
@@ -240,14 +253,14 @@ func (w *Watcher) emitError(err error) {
 		return
 	}
 	if w.logger != nil {
-		w.logger.Error("filewatch error", "err", err)
+		w.logger.Error("gaze error", "err", err)
 	}
 }
 
 func (w *Watcher) dispatchEvent(evt Event) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			w.emitError(fmt.Errorf("filewatch: event handler panic: %v", recovered))
+			w.emitError(fmt.Errorf("gaze: event handler panic: %v", recovered))
 		}
 	}()
 	if w.cfg.OnEvent == nil {
@@ -256,7 +269,7 @@ func (w *Watcher) dispatchEvent(evt Event) {
 			if evt.OldPath != "" {
 				attrs = append(attrs, "old_path", evt.OldPath)
 			}
-			w.logger.Info("filewatch event", attrs...)
+			w.logger.Info("gaze event", attrs...)
 		}
 		return
 	}
@@ -267,7 +280,7 @@ func (w *Watcher) dispatchError(err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			if w.logger != nil {
-				w.logger.Error("filewatch error handler panic", "panic", recovered)
+				w.logger.Error("gaze error handler panic", "panic", recovered)
 			}
 		}
 	}()
@@ -293,7 +306,7 @@ func (w *Watcher) prepareTarget(path string) (preparedTarget, error) {
 	}
 
 	if info.Mode()&os.ModeSymlink != 0 && !w.cfg.FollowSymlinks {
-		return preparedTarget{}, fmt.Errorf("filewatch: symlink root %q requires Config.FollowSymlinks = true", normalized)
+		return preparedTarget{}, fmt.Errorf("gaze: symlink root %q requires Config.FollowSymlinks = true", normalized)
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
 		normalized, err = filepath.EvalSymlinks(normalized)
@@ -308,14 +321,14 @@ func (w *Watcher) prepareTarget(path string) (preparedTarget, error) {
 
 	isDir := info.IsDir()
 	if w.matcher.ShouldExclude(normalized, isDir) {
-		return preparedTarget{}, fmt.Errorf("filewatch: excluded root %q", normalized)
+		return preparedTarget{}, fmt.Errorf("gaze: excluded root %q", normalized)
 	}
 
 	target := preparedTarget{
 		Path:      normalized,
 		WatchPath: normalized,
 		IsDir:     isDir,
-		Recursive: isDir && w.cfg.Recursive,
+		Recursive: isDir && w.cfg.recursiveEnabled(true),
 	}
 	if !isDir {
 		target.WatchPath = filepath.Dir(normalized)
@@ -326,7 +339,7 @@ func (w *Watcher) prepareTarget(path string) (preparedTarget, error) {
 
 func (w *Watcher) normalizePath(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
-		return "", errors.New("filewatch: empty path")
+		return "", errors.New("gaze: empty path")
 	}
 
 	abs, err := filepath.Abs(filepath.Clean(path))

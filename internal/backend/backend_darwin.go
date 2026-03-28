@@ -48,7 +48,7 @@ type entryMeta struct {
 func New(cfg Config) (Watcher, error) {
 	kq, err := unix.Kqueue()
 	if err != nil {
-		return nil, fmt.Errorf("filewatch: init kqueue: %w", err)
+		return nil, fmt.Errorf("gaze: init kqueue: %w", err)
 	}
 
 	w := &darwinWatcher{
@@ -168,7 +168,7 @@ func (w *darwinWatcher) run() {
 			if w.isClosed() {
 				return
 			}
-			w.emitError(fmt.Errorf("filewatch: kevent: %w", err))
+			w.emitError(fmt.Errorf("gaze: kevent: %w", err))
 			continue
 		}
 
@@ -270,7 +270,7 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 	}
 	fd, err := unix.Open(path, flag, 0)
 	if err != nil {
-		return fmt.Errorf("filewatch: open %q: %w", path, err)
+		return fmt.Errorf("gaze: open %q: %w", path, err)
 	}
 
 	change := []unix.Kevent_t{{}}
@@ -278,7 +278,7 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 	change[0].Fflags = darwinWatchFlags
 	if _, err := unix.Kevent(w.kq, change, nil, nil); err != nil {
 		_ = unix.Close(fd)
-		return fmt.Errorf("filewatch: register %q: %w", path, err)
+		return fmt.Errorf("gaze: register %q: %w", path, err)
 	}
 
 	w.mu.Lock()

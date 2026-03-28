@@ -5,5 +5,5 @@ package backend
 import "fmt"
 
 func New(Config) (Watcher, error) {
-	return nil, fmt.Errorf("filewatch: unsupported platform")
+	return nil, fmt.Errorf("gaze: unsupported platform")
 }

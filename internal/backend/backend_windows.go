@@ -75,7 +75,7 @@ func (w *windowsWatcher) Add(target Target) error {
 		0,
 	)
 	if err != nil {
-		return fmt.Errorf("filewatch: open %q: %w", target.WatchPath, err)
+		return fmt.Errorf("gaze: open %q: %w", target.WatchPath, err)
 	}
 
 	root := &windowsRoot{target: target, handle: handle}
@@ -151,7 +151,7 @@ func (w *windowsWatcher) runRoot(root *windowsRoot) {
 			if w.isClosed() || errors.Is(err, windows.ERROR_INVALID_HANDLE) || errors.Is(err, windows.ERROR_OPERATION_ABORTED) {
 				return
 			}
-			w.emitError(fmt.Errorf("filewatch: ReadDirectoryChangesW %q: %w", root.target.WatchPath, err))
+			w.emitError(fmt.Errorf("gaze: ReadDirectoryChangesW %q: %w", root.target.WatchPath, err))
 			return
 		}
 

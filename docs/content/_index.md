@@ -1,17 +1,30 @@
 ---
-title: "go-filewatch"
+title: "Gaze"
 description: "Pure-Go cross-platform file watching for Go."
 toc: false
 sidebar:
   hide: true
 ---
 
-`go.ofkm.dev/filewatch` is a public Go package for filesystem events across Linux, macOS, and Windows with no CGO dependency.
+`go.ofkm.dev/gaze` is the Gaze module: a public Go package for filesystem events across Linux, macOS, and Windows with no CGO dependency.
 
-It is callback-first by design:
+It is designed around a very simple entrypoint:
 
 ```go
 w, err := filewatch.WatchDirectory("my-directory")
+```
+
+When you need explicit configuration, construct a real config value and pass it to the matching `...WithConfig` constructor:
+
+```go
+cfg := filewatch.Config{
+	ExcludeGlobs: []string{"*.tmp", ".DS_Store"},
+	OnEvent: func(evt filewatch.Event) {
+		fmt.Println(evt.Op, evt.Path)
+	},
+}
+
+w, err := filewatch.WatchDirectoryWithConfig("my-directory", cfg)
 ```
 
 The package is intentionally opinionated for easy production use.
@@ -35,5 +48,5 @@ The package is intentionally opinionated for easy production use.
 
 - callbacks always run in package-owned goroutines
 - `Config.OnError` receives callback failures and runtime watcher errors
-- if no handler is provided, events and errors are logged with `slog`
+- if no handlers are provided, events and errors are logged with `slog`
 - `Config.Logger` replaces the default logger used by that fallback path

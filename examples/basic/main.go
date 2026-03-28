@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	gofilewatch "go.ofkm.dev/filewatch"
+	gofilewatch "go.ofkm.dev/gaze"
 )
 
 func main() {
@@ -25,28 +25,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	w, err := gofilewatch.WatchDirectory(
-		absTarget,
-		func(cfg *gofilewatch.Config) {
-			cfg.ExcludeGlobs = []string{"*.tmp", "*.swp", ".DS_Store"}
-			cfg.ExcludePrefixes = []string{filepath.Join(absTarget, ".git")}
-			cfg.OnEvent = func(evt gofilewatch.Event) {
-				if evt.OldPath != "" {
-					fmt.Printf("%s %s -> %s dir=%t\n", evt.Op, evt.OldPath, evt.Path, evt.IsDir)
-					return
-				}
-				fmt.Printf("%s %s dir=%t\n", evt.Op, evt.Path, evt.IsDir)
+	cfg := gofilewatch.Config{
+		ExcludeGlobs:    []string{"*.tmp", "*.swp", ".DS_Store"},
+		ExcludePrefixes: []string{filepath.Join(absTarget, ".git")},
+		OnEvent: func(evt gofilewatch.Event) {
+			if evt.OldPath != "" {
+				fmt.Printf("%s %s -> %s dir=%t\n", evt.Op, evt.OldPath, evt.Path, evt.IsDir)
+				return
 			}
-			cfg.OnError = func(err error) {
-				logger.Error("watch error", "err", err)
-			}
+			fmt.Printf("%s %s dir=%t\n", evt.Op, evt.Path, evt.IsDir)
 		},
-	)
+		OnError: func(err error) {
+			logger.Error("watch error", "err", err)
+		},
+	}
+
+	w, err := gofilewatch.WatchDirectoryWithConfig(absTarget, cfg)
 	if err != nil {
 		logger.Error("watch directory", "path", absTarget, "err", err)
 		os.Exit(1)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			logger.Error("close watcher", "err", err)
+		}
+	}()
 
 	fmt.Printf("watching %s\n", absTarget)
 	fmt.Println("press Ctrl+C to stop")

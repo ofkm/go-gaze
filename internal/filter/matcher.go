@@ -33,7 +33,7 @@ func New(cfg Config) (*Matcher, error) {
 			continue
 		}
 		if _, err := filepath.Match(glob, "probe"); err != nil {
-			return nil, fmt.Errorf("filewatch: invalid exclude glob %q: %w", glob, err)
+			return nil, fmt.Errorf("gaze: invalid exclude glob %q: %w", glob, err)
 		}
 		globs = append(globs, glob)
 	}

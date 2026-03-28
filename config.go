@@ -5,12 +5,18 @@ import (
 	"log/slog"
 )
 
-var ErrWatcherClosed = errors.New("filewatch: watcher closed")
+var ErrWatcherClosed = errors.New("gaze: watcher closed")
 
-type Configure func(*Config)
+type RecursionMode uint8
+
+const (
+	RecursionDefault RecursionMode = iota
+	RecursionDisabled
+	RecursionEnabled
+)
 
 type Config struct {
-	Recursive       bool
+	Recursion       RecursionMode
 	ExcludeGlobs    []string
 	ExcludePrefixes []string
 	Exclude         func(PathInfo) bool
@@ -22,25 +28,26 @@ type Config struct {
 	FollowSymlinks  bool
 }
 
-func DefaultConfig() Config {
-	return defaultConfig()
-}
-
 func defaultConfig() Config {
 	return Config{
-		Recursive:     true,
 		Logger:        slog.Default(),
 		Ops:           allOps,
 		QueueCapacity: 1024,
 	}
 }
 
-func applyConfig(cfg *Config, configure []Configure) {
-	for _, fn := range configure {
-		if fn != nil {
-			fn(cfg)
-		}
-	}
+func resolveConfig(override Config) Config {
+	cfg := defaultConfig()
+	cfg.Recursion = override.Recursion
+	cfg.ExcludeGlobs = override.ExcludeGlobs
+	cfg.ExcludePrefixes = override.ExcludePrefixes
+	cfg.Exclude = override.Exclude
+	cfg.OnEvent = override.OnEvent
+	cfg.OnError = override.OnError
+	cfg.Logger = override.Logger
+	cfg.Ops = override.Ops
+	cfg.QueueCapacity = override.QueueCapacity
+	cfg.FollowSymlinks = override.FollowSymlinks
 	if cfg.Ops == 0 {
 		cfg.Ops = allOps
 	} else {
@@ -48,5 +55,21 @@ func applyConfig(cfg *Config, configure []Configure) {
 	}
 	if cfg.QueueCapacity <= 0 {
 		cfg.QueueCapacity = defaultConfig().QueueCapacity
+	}
+	if cfg.Logger == nil {
+		cfg.Logger = defaultConfig().Logger
+	}
+
+	return cfg
+}
+
+func (cfg Config) recursiveEnabled(defaultValue bool) bool {
+	switch cfg.Recursion {
+	case RecursionEnabled:
+		return true
+	case RecursionDisabled:
+		return false
+	default:
+		return defaultValue
 	}
 }

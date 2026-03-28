@@ -1,12 +1,24 @@
-// Package filewatch provides a pure-Go filesystem watcher with native backends.
+// Package filewatch powers Gaze, a pure-Go filesystem watcher with native backends.
 //
 // It is designed around a simple entrypoint:
 //
 //	w, err := filewatch.WatchDirectory("my-directory")
 //
-// Event dispatch stays inside the package. Callers provide handlers by mutating
-// Config inside the constructor callback, or rely on the default slog-based
-// logging path for both events and internal watcher errors.
+// For explicit configuration, build a Config value directly and pass it to a
+// ...WithConfig constructor:
+//
+//	cfg := filewatch.Config{
+//		ExcludeGlobs: []string{"*.tmp"},
+//		OnEvent: func(evt filewatch.Event) {
+//			fmt.Println(evt.Op, evt.Path)
+//		},
+//	}
+//
+//	w, err := filewatch.WatchDirectoryWithConfig("my-directory", cfg)
+//
+// Event dispatch stays inside the package. Callers provide handlers through a
+// Config value, or rely on the default slog-based logging path for both events
+// and internal watcher errors.
 //
 // Linux and Windows are the strongest scalability targets. macOS remains pure-Go
 // and functional, but its backend enrolls more kernel watches and should be

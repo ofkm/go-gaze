@@ -1,6 +1,6 @@
-baseURL = "https://go.ofkm.dev/filewatch/"
+baseURL = "https://go.ofkm.dev/gaze/"
 languageCode = "en-us"
-title = "go-filewatch"
+title = "Gaze"
 enableRobotsTXT = true
 disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
 
@@ -9,7 +9,7 @@ disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
     path = "github.com/imfing/hextra"
 
 [params]
-description = "Pure-Go cross-platform file system events with no CGO."
+description = "Gaze is a pure-Go cross-platform file system watcher with no CGO."
 
   [params.navbar]
   displayTitle = true
@@ -57,7 +57,7 @@ description = "Pure-Go cross-platform file system events with no CGO."
       type = "separator"
   [[menu.sidebar]]
     name = "Module"
-    url = "https://pkg.go.dev/go.ofkm.dev/filewatch"
+    url = "https://pkg.go.dev/go.ofkm.dev/gaze"
     weight = 2
   [[menu.sidebar]]
     name = "Example App"

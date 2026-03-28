@@ -49,7 +49,7 @@ type pendingRename struct {
 func New(cfg Config) (Watcher, error) {
 	fd, err := unix.InotifyInit1(unix.IN_CLOEXEC)
 	if err != nil {
-		return nil, fmt.Errorf("filewatch: init inotify: %w", err)
+		return nil, fmt.Errorf("gaze: init inotify: %w", err)
 	}
 
 	w := &linuxWatcher{
@@ -165,7 +165,7 @@ func (w *linuxWatcher) addDir(root, dir string) error {
 
 	wd, err := unix.InotifyAddWatch(w.fd, dir, linuxWatchMask)
 	if err != nil {
-		return fmt.Errorf("filewatch: watch %q: %w", dir, err)
+		return fmt.Errorf("gaze: watch %q: %w", dir, err)
 	}
 	w.watched[dir] = &linuxNode{
 		wd:    wd,
@@ -197,7 +197,7 @@ func (w *linuxWatcher) run() {
 			if w.isClosed() {
 				return
 			}
-			w.emitError(fmt.Errorf("filewatch: poll inotify: %w", err))
+			w.emitError(fmt.Errorf("gaze: poll inotify: %w", err))
 			continue
 		}
 		if n == 0 {
@@ -212,7 +212,7 @@ func (w *linuxWatcher) run() {
 			if w.isClosed() {
 				return
 			}
-			w.emitError(fmt.Errorf("filewatch: read inotify: %w", err))
+			w.emitError(fmt.Errorf("gaze: read inotify: %w", err))
 			continue
 		}
 
