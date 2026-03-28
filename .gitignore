@@ -34,4 +34,4 @@ go.work.sum
 /docs/public/
 /docs/resources/
 /docs/.hugo_build.lock
-/examples/basic/filewatch-basic
+/example/gaze

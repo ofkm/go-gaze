@@ -1,6 +1,6 @@
 ---
-title: "API"
-description: "Public package surface for Gaze."
+title: 'API'
+description: 'Public package surface for Gaze.'
 weight: 2
 ---
 
@@ -149,7 +149,7 @@ cfg := gaze.Config{
 	QueueCapacity:  4096,
 	FollowSymlinks: false,
 	OnEvent: func(evt gaze.Event) {
-		fmt.Println(evt.Op, evt.Path)
+		fmt.Println(evt)
 	},
 	OnError: func(err error) {
 		logger.Error("watch error", "err", err)

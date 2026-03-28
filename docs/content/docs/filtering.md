@@ -1,6 +1,6 @@
 ---
-title: "Filtering"
-description: "Exclude paths before they are watched and before events are emitted."
+title: 'Filtering'
+description: 'Exclude paths before they are watched and before events are emitted.'
 weight: 3
 ---
 
@@ -71,7 +71,7 @@ Use `Exclude` when globs and prefixes are not quite enough.
 cfg := gaze.Config{
 	Ops: gaze.OpCreate | gaze.OpWrite | gaze.OpRename,
 	OnEvent: func(evt gaze.Event) {
-		fmt.Println(evt.Op, evt.Path)
+		fmt.Println(evt)
 	},
 }
 

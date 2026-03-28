@@ -1,5 +1,10 @@
 package gaze
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Op uint32
 
 const (
@@ -74,4 +79,15 @@ func (o Op) String() string {
 		return opStrings[0]
 	}
 	return opStrings[masked]
+}
+
+func (e Event) String() string {
+	label := "GAZE[" + strings.ToUpper(e.Op.String()) + "]"
+	if e.Op.Has(OpRename) && e.OldPath != "" {
+		return fmt.Sprintf("%s %s -> %s", label, e.OldPath, e.Path)
+	}
+	if e.Path == "" {
+		return label
+	}
+	return label + " " + e.Path
 }

@@ -39,7 +39,7 @@ func ExampleWatchDirectory() {
 
 	select {
 	case evt := <-events:
-		fmt.Println(evt.Op, evt.Path)
+		fmt.Println(evt)
 	default:
 	}
 }

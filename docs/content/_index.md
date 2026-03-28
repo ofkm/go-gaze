@@ -20,7 +20,7 @@ If you need filters or callbacks, pass a config:
 cfg := gaze.Config{
 	ExcludeGlobs: []string{"*.tmp", ".DS_Store"},
 	OnEvent: func(evt gaze.Event) {
-		fmt.Println(evt.Op, evt.Path)
+		fmt.Println(evt)
 	},
 }
 

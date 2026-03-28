@@ -2,6 +2,7 @@ package tree
 
 import (
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -53,12 +54,16 @@ func (i *Index) MovePrefix(oldPath, newPath string) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	updated := make(map[string]Root, len(i.roots))
-	for _, root := range i.roots {
+	var toDelete []string
+	var toAdd []Root
+	for key, root := range i.roots {
+		changed := false
 		if root.Path == oldPath {
 			root.Path = newPath
+			changed = true
 		} else if root.IsDir && hasPathPrefix(root.Path, oldPath) {
 			root.Path = joinMovedPath(root.Path, oldPath, newPath)
+			changed = true
 		}
 
 		if root.WatchPath == oldPath {
@@ -67,9 +72,19 @@ func (i *Index) MovePrefix(oldPath, newPath string) {
 			root.WatchPath = joinMovedPath(root.WatchPath, oldPath, newPath)
 		}
 
-		updated[root.Path] = root
+		if changed {
+			toDelete = append(toDelete, key)
+			toAdd = append(toAdd, root)
+		} else {
+			i.roots[key] = root
+		}
 	}
-	i.roots = updated
+	for _, key := range toDelete {
+		delete(i.roots, key)
+	}
+	for _, root := range toAdd {
+		i.roots[root.Path] = root
+	}
 	i.rebuild()
 }
 
@@ -81,7 +96,7 @@ func (i *Index) Matches(path string) bool {
 		return true
 	}
 
-	parent := filepath.Dir(path)
+	parent := parentDir(path)
 	if _, ok := i.flatDirs[parent]; ok {
 		return true
 	}
@@ -91,12 +106,25 @@ func (i *Index) Matches(path string) bool {
 		if _, ok := i.recursiveDirs[current]; ok {
 			return true
 		}
-		next := filepath.Dir(current)
+		next := parentDir(current)
 		if next == current {
 			return false
 		}
 		current = next
 	}
+}
+
+// parentDir returns the parent directory of path using zero-allocation
+// string slicing instead of filepath.Dir.
+func parentDir(path string) string {
+	idx := strings.LastIndexByte(path, filepath.Separator)
+	if idx < 0 {
+		return "."
+	}
+	if idx == 0 {
+		return string(filepath.Separator)
+	}
+	return path[:idx]
 }
 
 func (i *Index) rebuild() {

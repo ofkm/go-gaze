@@ -11,7 +11,7 @@
 //	cfg := gaze.Config{
 //		ExcludeGlobs: []string{"*.tmp"},
 //		OnEvent: func(evt gaze.Event) {
-//			fmt.Println(evt.Op, evt.Path)
+//			fmt.Println(evt)
 //		},
 //	}
 //

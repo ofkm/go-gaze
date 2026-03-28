@@ -8,7 +8,9 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -30,13 +32,14 @@ type darwinWatcher struct {
 	kq  int
 
 	mu           sync.Mutex
-	closed       bool
+	closedFlag   atomic.Bool
 	roots        map[string]Target
 	rootNodes    map[string]map[string]struct{}
 	watched      map[string]*darwinNode
 	fdToPath     map[uintptr]string
 	snapshots    map[string]map[string]entryMeta
 	snapshotPool sync.Pool
+	diffPool     sync.Pool
 
 	events chan Event
 	errors chan error
@@ -47,7 +50,7 @@ type darwinNode struct {
 	fd    int
 	path  string
 	isDir bool
-	roots map[string]struct{}
+	roots []string
 }
 
 type entryMeta struct {
@@ -74,6 +77,11 @@ func New(cfg Config) (Watcher, error) {
 				return make(map[string]entryMeta, 16)
 			},
 		},
+		diffPool: sync.Pool{
+			New: func() any {
+				return make(map[string]entryMeta, 8)
+			},
+		},
 		events: make(chan Event, cfg.BufferSize),
 		errors: make(chan error, 64),
 		done:   make(chan struct{}),
@@ -84,7 +92,7 @@ func New(cfg Config) (Watcher, error) {
 
 func (w *darwinWatcher) Add(target Target) error {
 	w.mu.Lock()
-	if w.closed {
+	if w.closedFlag.Load() {
 		w.mu.Unlock()
 		return os.ErrClosed
 	}
@@ -128,7 +136,7 @@ func (w *darwinWatcher) Remove(path string) error {
 		if node == nil {
 			continue
 		}
-		delete(node.roots, path)
+		node.roots = slices.DeleteFunc(node.roots, func(s string) bool { return s == path })
 		if len(node.roots) == 0 {
 			_ = w.unregisterLocked(node)
 		}
@@ -149,23 +157,22 @@ func (w *darwinWatcher) Errors() <-chan error {
 
 func (w *darwinWatcher) Close() error {
 	w.mu.Lock()
-	if w.closed {
+	if w.closedFlag.Load() {
 		w.mu.Unlock()
 		return nil
 	}
-	w.closed = true
+	w.closedFlag.Store(true)
 
 	for _, node := range w.watched {
 		_ = darwinClose(node.fd)
 	}
-	for _, snapshot := range w.snapshots {
-		w.putSnapshotMap(snapshot)
-	}
+	// Clear snapshots under the lock to avoid racing with rescanDir.
 	w.watched = map[string]*darwinNode{}
 	w.snapshots = map[string]map[string]entryMeta{}
 	err := darwinClose(w.kq)
 	w.mu.Unlock()
 
+	// Wait for the kqueue goroutine to exit before returning.
 	<-w.done
 	return err
 }
@@ -276,7 +283,9 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 
 	w.mu.Lock()
 	if node := w.watched[path]; node != nil {
-		node.roots[root] = struct{}{}
+		if !slices.Contains(node.roots, root) {
+			node.roots = append(node.roots, root)
+		}
 		w.rootNodes[root][path] = struct{}{}
 		w.mu.Unlock()
 		return nil
@@ -303,13 +312,15 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed {
+	if w.closedFlag.Load() {
 		_ = darwinClose(fd)
 		return os.ErrClosed
 	}
 	if node := w.watched[path]; node != nil {
 		_ = darwinClose(fd)
-		node.roots[root] = struct{}{}
+		if !slices.Contains(node.roots, root) {
+			node.roots = append(node.roots, root)
+		}
 		w.rootNodes[root][path] = struct{}{}
 		return nil
 	}
@@ -318,7 +329,7 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 		fd:    fd,
 		path:  path,
 		isDir: isDir,
-		roots: map[string]struct{}{root: {}},
+		roots: []string{root},
 	}
 	w.fdToPath[uintptr(fd)] = path
 	w.rootNodes[root][path] = struct{}{}
@@ -336,16 +347,14 @@ func (w *darwinWatcher) rescanDir(path string) {
 		return
 	}
 	oldSnapshot := w.snapshots[path]
-	roots := make([]string, 0, len(node.roots))
-	for root := range node.roots {
-		roots = append(roots, root)
-	}
+	var rootsBuf [4]string
+	roots := append(rootsBuf[:0], node.roots...)
 	w.mu.Unlock()
 
 	newSnapshot := w.readDirSnapshot(path)
 
-	added := make(map[string]entryMeta)
-	removed := make(map[string]entryMeta)
+	added := w.takeDiffMap()
+	removed := w.takeDiffMap()
 	for name, meta := range oldSnapshot {
 		if _, ok := newSnapshot[name]; !ok {
 			removed[name] = meta
@@ -357,19 +366,21 @@ func (w *darwinWatcher) rescanDir(path string) {
 		}
 	}
 
+	pathPrefix := path + string(filepath.Separator)
+
 	for oldName, oldMeta := range removed {
 		for newName, newMeta := range added {
 			if oldMeta.inode == 0 || oldMeta.inode != newMeta.inode || oldMeta.isDir != newMeta.isDir {
 				continue
 			}
-			oldPath := filepath.Join(path, oldName)
-			newPath := filepath.Join(path, newName)
+			oldFull := pathPrefix + oldName
+			newFull := pathPrefix + newName
 			if oldMeta.isDir {
-				w.renamePrefix(oldPath, newPath)
+				w.renamePrefix(oldFull, newFull)
 			} else {
-				w.renamePath(oldPath, newPath)
+				w.renamePath(oldFull, newFull)
 			}
-			w.emitEvent(Event{Path: newPath, OldPath: oldPath, Op: OpRename, IsDir: oldMeta.isDir})
+			w.emitEvent(Event{Path: newFull, OldPath: oldFull, Op: OpRename, IsDir: oldMeta.isDir})
 			delete(removed, oldName)
 			delete(added, newName)
 			break
@@ -377,7 +388,7 @@ func (w *darwinWatcher) rescanDir(path string) {
 	}
 
 	for name, meta := range removed {
-		child := filepath.Join(path, name)
+		child := pathPrefix + name
 		if meta.isDir {
 			w.removePrefix(child)
 		} else {
@@ -387,7 +398,7 @@ func (w *darwinWatcher) rescanDir(path string) {
 	}
 
 	for name, meta := range added {
-		child := filepath.Join(path, name)
+		child := pathPrefix + name
 		if w.cfg.ShouldExclude != nil && w.cfg.ShouldExclude(child, meta.isDir) {
 			continue
 		}
@@ -411,6 +422,9 @@ func (w *darwinWatcher) rescanDir(path string) {
 		}
 		w.emitEvent(Event{Path: child, Op: OpCreate, IsDir: meta.isDir})
 	}
+
+	w.putDiffMap(added)
+	w.putDiffMap(removed)
 
 	w.mu.Lock()
 	w.snapshots[path] = newSnapshot
@@ -440,33 +454,31 @@ func (w *darwinWatcher) renamePrefix(oldPrefix, newPrefix string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	updated := make(map[string]*darwinNode, len(w.watched))
-	updatedSnapshots := make(map[string]map[string]entryMeta, len(w.snapshots))
-	for path, node := range w.watched {
+	// Collect keys to rename first to avoid mutating map during iteration.
+	var toRename []string
+	for path := range w.watched {
 		if hasPathPrefix(path, oldPrefix) {
-			newPath := filepath.Clean(newPrefix + path[len(oldPrefix):])
-			node.path = newPath
-			updated[newPath] = node
-			w.fdToPath[uintptr(node.fd)] = newPath
-			for root := range node.roots {
-				delete(w.rootNodes[root], path)
-				w.rootNodes[root][newPath] = struct{}{}
-			}
-			if snapshot, ok := w.snapshots[path]; ok {
-				updatedSnapshots[newPath] = snapshot
-				delete(w.snapshots, path)
-			}
-			continue
-		}
-		updated[path] = node
-	}
-	for path, snapshot := range w.snapshots {
-		if _, ok := updatedSnapshots[path]; !ok {
-			updatedSnapshots[path] = snapshot
+			toRename = append(toRename, path)
 		}
 	}
-	w.watched = updated
-	w.snapshots = updatedSnapshots
+
+	for _, path := range toRename {
+		node := w.watched[path]
+		newPath := newPrefix + path[len(oldPrefix):]
+
+		delete(w.watched, path)
+		node.path = newPath
+		w.watched[newPath] = node
+		w.fdToPath[uintptr(node.fd)] = newPath
+		for _, root := range node.roots {
+			delete(w.rootNodes[root], path)
+			w.rootNodes[root][newPath] = struct{}{}
+		}
+		if snapshot, ok := w.snapshots[path]; ok {
+			delete(w.snapshots, path)
+			w.snapshots[newPath] = snapshot
+		}
+	}
 }
 
 func (w *darwinWatcher) renamePath(oldPath, newPath string) {
@@ -481,7 +493,7 @@ func (w *darwinWatcher) renamePath(oldPath, newPath string) {
 	w.watched[newPath] = node
 	w.fdToPath[uintptr(node.fd)] = newPath
 	node.path = newPath
-	for root := range node.roots {
+	for _, root := range node.roots {
 		delete(w.rootNodes[root], oldPath)
 		w.rootNodes[root][newPath] = struct{}{}
 	}
@@ -494,7 +506,7 @@ func (w *darwinWatcher) unregisterLocked(node *darwinNode) error {
 		w.putSnapshotMap(snapshot)
 	}
 	delete(w.watched, node.path)
-	for root := range node.roots {
+	for _, root := range node.roots {
 		delete(w.rootNodes[root], node.path)
 	}
 	return darwinClose(node.fd)
@@ -512,8 +524,9 @@ func (w *darwinWatcher) readDirSnapshot(path string) map[string]entryMeta {
 		return w.takeSnapshotMap()
 	}
 	snapshot := w.takeSnapshotMap()
+	pathPrefix := path + string(filepath.Separator)
 	for _, entry := range entries {
-		child := filepath.Join(path, entry.Name())
+		child := pathPrefix + entry.Name()
 		if w.cfg.ShouldExclude != nil && w.cfg.ShouldExclude(child, entry.IsDir()) {
 			continue
 		}
@@ -554,9 +567,24 @@ func (w *darwinWatcher) emitError(err error) {
 }
 
 func (w *darwinWatcher) isClosed() bool {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.closed
+	return w.closedFlag.Load()
+}
+
+func (w *darwinWatcher) takeDiffMap() map[string]entryMeta {
+	m, _ := w.diffPool.Get().(map[string]entryMeta)
+	if m == nil {
+		return make(map[string]entryMeta, 8)
+	}
+	clear(m)
+	return m
+}
+
+func (w *darwinWatcher) putDiffMap(m map[string]entryMeta) {
+	if m == nil {
+		return
+	}
+	clear(m)
+	w.diffPool.Put(m)
 }
 
 func inodeForPath(path string) uint64 {

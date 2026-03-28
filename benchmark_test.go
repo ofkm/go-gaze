@@ -78,3 +78,42 @@ func BenchmarkTreeMatches(b *testing.B) {
 		_ = index.Matches("/workspace/config.yaml")
 	}
 }
+
+func BenchmarkTreeMatchesDeepPath(b *testing.B) {
+	index := tree.New()
+	_ = index.Add(tree.Root{Path: "/workspace", WatchPath: "/workspace", IsDir: true, Recursive: true})
+
+	deep := "/workspace/src/internal/backend/watcher/handler/event.go"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = index.Matches(deep)
+	}
+}
+
+func BenchmarkFilterShouldExcludeDeepPath(b *testing.B) {
+	matcher, err := filter.New(filter.Config{
+		Prefixes: []string{"/project/.git", "/project/node_modules", "/project/vendor"},
+		Globs:    []string{"*.tmp", "*.swp", ".DS_Store", "*.log"},
+	})
+	if err != nil {
+		b.Fatalf("filter.New() error = %v", err)
+	}
+
+	deep := "/project/src/internal/backend/watcher/handler/event.go"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = matcher.ShouldExclude(deep, false)
+	}
+}
+
+func BenchmarkTreeMovePrefix(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		index := tree.New()
+		_ = index.Add(tree.Root{
+			Path: "/workspace", WatchPath: "/workspace",
+			IsDir: true, Recursive: true,
+		})
+		index.MovePrefix("/workspace/old", "/workspace/new")
+	}
+}

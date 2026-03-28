@@ -1,10 +1,14 @@
 package queue
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 type Queue[T any] struct {
 	ch        chan T
 	done      chan struct{}
+	closed    atomic.Bool
 	closeOnce sync.Once
 }
 
@@ -19,10 +23,8 @@ func New[T any](capacity int) *Queue[T] {
 }
 
 func (q *Queue[T]) Push(v T) bool {
-	select {
-	case <-q.done:
+	if q.closed.Load() {
 		return false
-	default:
 	}
 
 	select {
@@ -51,6 +53,7 @@ func (q *Queue[T]) Pop() (T, bool) {
 
 func (q *Queue[T]) Close() {
 	q.closeOnce.Do(func() {
+		q.closed.Store(true)
 		close(q.done)
 	})
 }

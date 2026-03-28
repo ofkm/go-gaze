@@ -1,6 +1,6 @@
 ---
-title: "Quickstart"
-description: "Install the package and start watching directories."
+title: 'Quickstart'
+description: 'Install the package and start watching directories.'
 weight: 1
 ---
 
@@ -66,7 +66,7 @@ func main() {
 	cfg := gaze.Config{
 		ExcludeGlobs: []string{"*.tmp", "*.swp", ".DS_Store"},
 		OnEvent: func(evt gaze.Event) {
-			fmt.Printf("%s %s\n", evt.Op, evt.Path)
+			fmt.Println(evt)
 		},
 		OnError: func(err error) {
 			logger.Error("watcher error", "err", err)
@@ -95,7 +95,7 @@ func main() {
 ```go
 cfg := gaze.Config{
 	OnEvent: func(evt gaze.Event) {
-		fmt.Println(evt.Op, evt.Path)
+		fmt.Println(evt)
 	},
 }
 
@@ -120,7 +120,7 @@ defer func() {
 cfg := gaze.Config{
 	Recursion: gaze.RecursionDisabled,
 	OnEvent: func(evt gaze.Event) {
-		fmt.Println(evt.Op, evt.Path)
+		fmt.Println(evt)
 	},
 }
 

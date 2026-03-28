@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -132,13 +133,13 @@ func TestDarwinWatcherHelpers(t *testing.T) {
 				fd:    dirFD,
 				path:  oldDir,
 				isDir: true,
-				roots: map[string]struct{}{oldDir: {}},
+				roots: []string{oldDir},
 			},
 			oldFile: {
 				fd:    fileFD,
 				path:  oldFile,
 				isDir: false,
-				roots: map[string]struct{}{oldDir: {}},
+				roots: []string{oldDir},
 			},
 		},
 		fdToPath: map[uintptr]string{
@@ -181,11 +182,11 @@ func TestDarwinWatcherHelpers(t *testing.T) {
 	w.errors <- os.ErrExist
 	w.emitError(os.ErrInvalid)
 
-	w.closed = true
+	w.closedFlag.Store(true)
 	if !w.isClosed() {
 		t.Fatal("isClosed() = false, want true")
 	}
-	w.closed = false
+	w.closedFlag.Store(false)
 
 	if got := w.rootTarget(oldDir); got.Path != oldDir {
 		t.Fatalf("rootTarget() = %+v, want root %q", got, oldDir)
@@ -295,19 +296,19 @@ func TestDarwinWatcherRescanDir(t *testing.T) {
 				fd:    rootFD,
 				path:  root,
 				isDir: true,
-				roots: map[string]struct{}{root: {}},
+				roots: []string{root},
 			},
 			oldName: {
 				fd:    oldFD,
 				path:  oldName,
 				isDir: false,
-				roots: map[string]struct{}{root: {}},
+				roots: []string{root},
 			},
 			removeName: {
 				fd:    removeFD,
 				path:  removeName,
 				isDir: false,
-				roots: map[string]struct{}{root: {}},
+				roots: []string{root},
 			},
 		},
 		fdToPath: map[uintptr]string{
@@ -405,19 +406,19 @@ func TestDarwinWatcherHandle(t *testing.T) {
 				fd:    rootFD,
 				path:  root,
 				isDir: true,
-				roots: map[string]struct{}{root: {}},
+				roots: []string{root},
 			},
 			filePath: {
 				fd:    fileFD,
 				path:  filePath,
 				isDir: false,
-				roots: map[string]struct{}{root: {}},
+				roots: []string{root},
 			},
 			dirPath: {
 				fd:    dirFD,
 				path:  dirPath,
 				isDir: true,
-				roots: map[string]struct{}{root: {}},
+				roots: []string{root},
 			},
 		},
 		fdToPath: map[uintptr]string{
@@ -563,9 +564,7 @@ func TestDarwinWatcherRunHandlesEINTRAndError(t *testing.T) {
 		case 2:
 			return 0, unix.EBADF
 		default:
-			w.mu.Lock()
-			w.closed = true
-			w.mu.Unlock()
+			w.closedFlag.Store(true)
 			return 0, unix.EBADF
 		}
 	}
@@ -585,7 +584,7 @@ func TestDarwinWatcherRunHandlesEINTRAndError(t *testing.T) {
 func TestDarwinWatcherAddClosed(t *testing.T) {
 	stubDarwinSyscalls(t)
 	w := newDarwinWatcherForTests(Config{})
-	w.closed = true
+	w.closedFlag.Store(true)
 
 	err := w.Add(Target{Path: "/tmp/root", WatchPath: "/tmp/root", IsDir: true})
 	if !errors.Is(err, os.ErrClosed) {
@@ -770,7 +769,7 @@ func TestDarwinWatcherAddPathBranches(t *testing.T) {
 		path := "/tmp/root/file.txt"
 		w.roots[root] = Target{Path: root}
 		w.rootNodes[root] = map[string]struct{}{}
-		w.closed = true
+		w.closedFlag.Store(true)
 
 		err := w.addPath(root, path, false)
 		if !errors.Is(err, os.ErrClosed) {
@@ -785,12 +784,12 @@ func TestDarwinWatcherAddPathBranches(t *testing.T) {
 		path := "/tmp/root/file.txt"
 		w.roots[root] = Target{Path: root}
 		w.rootNodes[root] = map[string]struct{}{}
-		w.watched[path] = &darwinNode{path: path, roots: map[string]struct{}{"other": {}}}
+		w.watched[path] = &darwinNode{path: path, roots: []string{"other"}}
 
 		if err := w.addPath(root, path, false); err != nil {
 			t.Fatalf("addPath() error = %v", err)
 		}
-		if _, ok := w.watched[path].roots[root]; !ok {
+		if !slices.Contains(w.watched[path].roots, root) {
 			t.Fatal("expected root to be attached to existing node")
 		}
 		if _, ok := w.rootNodes[root][path]; !ok {
@@ -807,7 +806,7 @@ func TestDarwinWatcherAddPathBranches(t *testing.T) {
 		w.rootNodes[root] = map[string]struct{}{}
 		darwinKevent = func(int, []unix.Kevent_t, []unix.Kevent_t, *unix.Timespec) (int, error) {
 			w.mu.Lock()
-			w.watched[path] = &darwinNode{path: path, roots: map[string]struct{}{"other": {}}}
+			w.watched[path] = &darwinNode{path: path, roots: []string{"other"}}
 			w.mu.Unlock()
 			return 0, nil
 		}
@@ -815,7 +814,7 @@ func TestDarwinWatcherAddPathBranches(t *testing.T) {
 		if err := w.addPath(root, path, false); err != nil {
 			t.Fatalf("addPath() error = %v", err)
 		}
-		if _, ok := w.watched[path].roots[root]; !ok {
+		if !slices.Contains(w.watched[path].roots, root) {
 			t.Fatal("expected root to be attached after late duplicate detection")
 		}
 	})
@@ -833,7 +832,7 @@ func TestDarwinWatcherRemoveBranches(t *testing.T) {
 	path := "/tmp/root/file.txt"
 	w.roots[root] = Target{Path: root}
 	w.rootNodes[root] = map[string]struct{}{path: {}, "/tmp/root/missing-node": {}}
-	w.watched[path] = &darwinNode{fd: 1, path: path, roots: map[string]struct{}{root: {}}}
+	w.watched[path] = &darwinNode{fd: 1, path: path, roots: []string{root}}
 
 	if err := w.Remove(root); err != nil {
 		t.Fatalf("Remove() error = %v", err)
@@ -852,8 +851,8 @@ func TestDarwinWatcherRenamePrefixMovesChildrenAndSnapshots(t *testing.T) {
 	newDir := filepath.Join(root, "new")
 	newChild := filepath.Join(newDir, "child.txt")
 	w.rootNodes[root] = map[string]struct{}{oldDir: {}, oldChild: {}}
-	w.watched[oldDir] = &darwinNode{fd: 1, path: oldDir, isDir: true, roots: map[string]struct{}{root: {}}}
-	w.watched[oldChild] = &darwinNode{fd: 2, path: oldChild, isDir: false, roots: map[string]struct{}{root: {}}}
+	w.watched[oldDir] = &darwinNode{fd: 1, path: oldDir, isDir: true, roots: []string{root}}
+	w.watched[oldChild] = &darwinNode{fd: 2, path: oldChild, isDir: false, roots: []string{root}}
 	w.fdToPath[1] = oldDir
 	w.fdToPath[2] = oldChild
 	w.snapshots[oldDir] = map[string]entryMeta{"child.txt": {inode: 1}}
@@ -899,9 +898,9 @@ func TestDarwinWatcherRescanDirUpdatesState(t *testing.T) {
 	w := newDarwinWatcherForTests(Config{})
 	w.roots[root] = Target{Path: root, WatchPath: root, IsDir: true, Recursive: true}
 	w.rootNodes[root] = map[string]struct{}{root: {}, oldPath: {}, removedPath: {}}
-	w.watched[root] = &darwinNode{fd: 1, path: root, isDir: true, roots: map[string]struct{}{root: {}}}
-	w.watched[oldPath] = &darwinNode{fd: 2, path: oldPath, roots: map[string]struct{}{root: {}}}
-	w.watched[removedPath] = &darwinNode{fd: 3, path: removedPath, roots: map[string]struct{}{root: {}}}
+	w.watched[root] = &darwinNode{fd: 1, path: root, isDir: true, roots: []string{root}}
+	w.watched[oldPath] = &darwinNode{fd: 2, path: oldPath, roots: []string{root}}
+	w.watched[removedPath] = &darwinNode{fd: 3, path: removedPath, roots: []string{root}}
 	w.fdToPath[1] = root
 	w.fdToPath[2] = oldPath
 	w.fdToPath[3] = removedPath

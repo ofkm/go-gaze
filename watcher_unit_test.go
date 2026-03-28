@@ -120,6 +120,22 @@ func TestOpString(t *testing.T) {
 	}
 }
 
+func TestEventString(t *testing.T) {
+	t.Parallel()
+
+	if got := (Event{Path: "/tmp/file.txt", Op: OpCreate}).String(); got != "GAZE[CREATE] /tmp/file.txt" {
+		t.Fatalf("create Event.String() = %q, want %q", got, "GAZE[CREATE] /tmp/file.txt")
+	}
+
+	if got := (Event{OldPath: "/tmp/old.txt", Path: "/tmp/new.txt", Op: OpRename}).String(); got != "GAZE[RENAME] /tmp/old.txt -> /tmp/new.txt" {
+		t.Fatalf("rename Event.String() = %q, want %q", got, "GAZE[RENAME] /tmp/old.txt -> /tmp/new.txt")
+	}
+
+	if got := (Event{Op: OpOverflow}).String(); got != "GAZE[OVERFLOW]" {
+		t.Fatalf("overflow Event.String() = %q, want %q", got, "GAZE[OVERFLOW]")
+	}
+}
+
 func TestResolveConfigAndRecursionMode(t *testing.T) {
 	t.Parallel()
 
