@@ -16,6 +16,15 @@ import (
 
 const darwinWatchFlags = unix.NOTE_DELETE | unix.NOTE_WRITE | unix.NOTE_ATTRIB | unix.NOTE_RENAME | unix.NOTE_EXTEND | unix.NOTE_REVOKE
 
+var (
+	darwinKqueue  = unix.Kqueue
+	darwinKevent  = unix.Kevent
+	darwinOpen    = unix.Open
+	darwinClose   = unix.Close
+	darwinReadDir = os.ReadDir
+	darwinLstat   = unix.Lstat
+)
+
 type darwinWatcher struct {
 	cfg Config
 	kq  int
@@ -46,7 +55,7 @@ type entryMeta struct {
 }
 
 func New(cfg Config) (Watcher, error) {
-	kq, err := unix.Kqueue()
+	kq, err := darwinKqueue()
 	if err != nil {
 		return nil, fmt.Errorf("gaze: init kqueue: %w", err)
 	}
@@ -141,10 +150,10 @@ func (w *darwinWatcher) Close() error {
 	w.closed = true
 
 	for _, node := range w.watched {
-		_ = unix.Close(node.fd)
+		_ = darwinClose(node.fd)
 	}
 	w.watched = map[string]*darwinNode{}
-	err := unix.Close(w.kq)
+	err := darwinClose(w.kq)
 	w.mu.Unlock()
 
 	<-w.done
@@ -160,7 +169,7 @@ func (w *darwinWatcher) run() {
 
 	events := make([]unix.Kevent_t, 128)
 	for {
-		n, err := unix.Kevent(w.kq, nil, events, nil)
+		n, err := darwinKevent(w.kq, nil, events, nil)
 		if err != nil {
 			if errors.Is(err, unix.EINTR) {
 				continue
@@ -231,7 +240,7 @@ func (w *darwinWatcher) enrollDirectoryTarget(target Target) error {
 	if err := w.addPath(target.Path, target.Path, true); err != nil {
 		return err
 	}
-	entries, err := os.ReadDir(target.Path)
+	entries, err := darwinReadDir(target.Path)
 	if err != nil {
 		return err
 	}
@@ -268,7 +277,7 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 	if isDir {
 		flag = unix.O_EVTONLY
 	}
-	fd, err := unix.Open(path, flag, 0)
+	fd, err := darwinOpen(path, flag, 0)
 	if err != nil {
 		return fmt.Errorf("gaze: open %q: %w", path, err)
 	}
@@ -276,8 +285,8 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 	change := []unix.Kevent_t{{}}
 	unix.SetKevent(&change[0], fd, unix.EVFILT_VNODE, unix.EV_ADD|unix.EV_ENABLE|unix.EV_CLEAR)
 	change[0].Fflags = darwinWatchFlags
-	if _, err := unix.Kevent(w.kq, change, nil, nil); err != nil {
-		_ = unix.Close(fd)
+	if _, err := darwinKevent(w.kq, change, nil, nil); err != nil {
+		_ = darwinClose(fd)
 		return fmt.Errorf("gaze: register %q: %w", path, err)
 	}
 
@@ -285,11 +294,11 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 	defer w.mu.Unlock()
 
 	if w.closed {
-		_ = unix.Close(fd)
+		_ = darwinClose(fd)
 		return os.ErrClosed
 	}
 	if node := w.watched[path]; node != nil {
-		_ = unix.Close(fd)
+		_ = darwinClose(fd)
 		node.roots[root] = struct{}{}
 		w.rootNodes[root][path] = struct{}{}
 		return nil
@@ -474,7 +483,7 @@ func (w *darwinWatcher) unregisterLocked(node *darwinNode) error {
 	for root := range node.roots {
 		delete(w.rootNodes[root], node.path)
 	}
-	return unix.Close(node.fd)
+	return darwinClose(node.fd)
 }
 
 func (w *darwinWatcher) rootTarget(root string) Target {
@@ -484,7 +493,7 @@ func (w *darwinWatcher) rootTarget(root string) Target {
 }
 
 func (w *darwinWatcher) readDirSnapshot(path string) map[string]entryMeta {
-	entries, err := os.ReadDir(path)
+	entries, err := darwinReadDir(path)
 	if err != nil {
 		return map[string]entryMeta{}
 	}
@@ -521,7 +530,7 @@ func (w *darwinWatcher) isClosed() bool {
 
 func inodeForPath(path string) uint64 {
 	var stat unix.Stat_t
-	if err := unix.Lstat(path, &stat); err != nil {
+	if err := darwinLstat(path, &stat); err != nil {
 		return 0
 	}
 	return stat.Ino

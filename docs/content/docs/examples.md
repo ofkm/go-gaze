@@ -6,14 +6,14 @@ weight: 5
 
 ## Runnable example module
 
-The repository includes a runnable example:
+The repo includes a small runnable example:
 
 ```bash
 cd examples/basic
 go run .
 ```
 
-## Basic callback watch
+## Basic directory watch
 
 ```go
 package main
@@ -60,7 +60,7 @@ func main() {
 }
 ```
 
-## Watch a single file
+## Watch one file
 
 ```go
 cfg := gaze.Config{
@@ -80,7 +80,7 @@ defer func() {
 }()
 ```
 
-## Multi-root watcher with dynamic add/remove
+## Multi-root watcher
 
 ```go
 cfg := gaze.Config{
@@ -113,7 +113,7 @@ if err := w.Remove("/srv/app/config"); err != nil {
 }
 ```
 
-## Op filtering
+## Filter by operation
 
 ```go
 cfg := gaze.Config{
@@ -129,7 +129,7 @@ if err != nil {
 }
 ```
 
-## Logger-only fallback
+## Logger-only setup
 
 ```go
 logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -143,9 +143,9 @@ if err != nil {
 }
 ```
 
-Without handlers, Gaze writes events and internal errors to the configured logger.
+If you leave out handlers, Gaze writes events and internal errors to the configured logger.
 
-## Follow symlinks intentionally
+## Follow symlinks
 
 ```go
 cfg := gaze.Config{
@@ -161,7 +161,7 @@ if err != nil {
 }
 ```
 
-## Rename and overflow awareness
+## Rename and overflow handling
 
 ```go
 if evt.Op&gaze.OpRename != 0 {

@@ -10,9 +10,9 @@ weight: 1
 go get go.ofkm.dev/gaze
 ```
 
-## Simplest watch
+## Smallest useful example
 
-This is the shortest path. Gaze owns the watcher goroutines for you and logs normalized events and internal errors with `slog.Default()` when you do not provide handlers.
+This is the quickest way to start watching a directory. If you do not provide handlers, Gaze logs events and watcher errors with `slog.Default()`.
 
 ```go
 package main
@@ -44,9 +44,9 @@ func main() {
 }
 ```
 
-## Structured config
+## Using `Config`
 
-When you need filters, callbacks, or a custom logger, use a plain struct literal with `WatchDirectoryWithConfig`.
+Use `WatchDirectoryWithConfig` when you want filters, callbacks, or your own logger.
 
 ```go
 package main
@@ -90,7 +90,7 @@ func main() {
 }
 ```
 
-## Watch a single file
+## Watching one file
 
 ```go
 cfg := gaze.Config{
@@ -110,11 +110,11 @@ defer func() {
 }()
 ```
 
-`WatchFile` and `WatchFileWithConfig` watch the file's parent directory and only emit events for the target file.
+`WatchFile` and `WatchFileWithConfig` watch the parent directory and only deliver events for the file you asked for.
 
-## Disable recursion explicitly
+## Turning recursion off
 
-`WatchDirectory` is recursive by default. To watch only the top-level directory, set `Recursion: gaze.RecursionDisabled`.
+`WatchDirectory` is recursive by default. If you only want the top level, set `Recursion: gaze.RecursionDisabled`.
 
 ```go
 cfg := gaze.Config{
@@ -130,7 +130,7 @@ if err != nil {
 }
 ```
 
-## Follow symlinks intentionally
+## Following symlinks
 
 Symlink roots are rejected unless you opt in.
 
@@ -145,6 +145,6 @@ if err != nil {
 }
 ```
 
-## Logging fallback
+## Logging behavior
 
-If you leave out `Config.OnEvent` and `Config.OnError`, Gaze logs normalized events and runtime errors with `Config.Logger`. If `Config.Logger` is nil, the package uses `slog.Default()`.
+If you leave out `Config.OnEvent` and `Config.OnError`, Gaze logs normalized events and runtime errors with `Config.Logger`. If `Config.Logger` is nil, it falls back to `slog.Default()`.

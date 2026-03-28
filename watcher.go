@@ -15,6 +15,11 @@ import (
 	"go.ofkm.dev/gaze/internal/tree"
 )
 
+var (
+	newMatcher = filter.New
+	newBackend = backend.New
+)
+
 type Watcher struct {
 	cfg     Config
 	matcher *filter.Matcher
@@ -76,7 +81,7 @@ func NewWithConfig(cfg Config) (*Watcher, error) {
 }
 
 func newWatcher(cfg Config) (*Watcher, error) {
-	matcher, err := filter.New(filter.Config{
+	matcher, err := newMatcher(filter.Config{
 		Prefixes: cfg.ExcludePrefixes,
 		Globs:    cfg.ExcludeGlobs,
 		Exclude: func(path string, isDir bool) bool {
@@ -97,7 +102,7 @@ func newWatcher(cfg Config) (*Watcher, error) {
 		cfg.Logger = slog.Default()
 	}
 
-	driver, err := backend.New(backend.Config{
+	driver, err := newBackend(backend.Config{
 		BufferSize:     max(cfg.QueueCapacity, 64),
 		FollowSymlinks: cfg.FollowSymlinks,
 		ShouldExclude:  matcher.ShouldExclude,

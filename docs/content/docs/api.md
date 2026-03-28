@@ -15,10 +15,10 @@ func New() (*Watcher, error)
 func NewWithConfig(cfg Config) (*Watcher, error)
 ```
 
-- `WatchDirectory` is the shortest path for recursive directory watching with default logging.
-- `WatchDirectoryWithConfig` gives you the same behavior with explicit configuration.
-- `WatchFile` watches a single file through its parent directory.
-- `New` and `NewWithConfig` create an empty watcher for multi-root use through `Add`.
+- `WatchDirectory` is the simplest way to watch a directory recursively.
+- `WatchDirectoryWithConfig` does the same thing with explicit configuration.
+- `WatchFile` watches one file by watching its parent directory.
+- `New` and `NewWithConfig` create an empty watcher so you can `Add` roots later.
 
 ## Watcher lifecycle
 
@@ -28,11 +28,11 @@ func (w *Watcher) Remove(path string) error
 func (w *Watcher) Close() error
 ```
 
-- `Add` accepts both files and directories.
-- `Remove` removes the exact root you added earlier.
-- `Close` is idempotent and releases backend watches, queue state, and package-owned goroutines.
+- `Add` accepts either a file or a directory.
+- `Remove` removes the exact root you added.
+- `Close` is idempotent.
 
-`ErrWatcherClosed` is returned when you call methods after shutdown:
+`ErrWatcherClosed` is returned when you use a watcher after shutdown:
 
 ```go
 var ErrWatcherClosed = errors.New("gaze: watcher closed")
@@ -60,20 +60,20 @@ const (
 )
 ```
 
-- `Path` is the effective path for the event.
-- `OldPath` is set when the backend can pair a rename reliably.
-- `IsDir` reports whether the subject is a directory.
-- `OpOverflow` means backend or queue fidelity was lost and the caller should rescan.
+- `Path` is the main path for the event.
+- `OldPath` is set when a rename can be paired.
+- `IsDir` tells you whether the subject is a directory.
+- `OpOverflow` means the backend or queue lost fidelity and you should rescan if exact state matters.
 
 ### Delivery notes
 
-- Callbacks run serially on package-owned goroutines.
-- `OpRename` may degrade to remove-plus-create when a backend cannot pair both sides.
-- Callback panics are recovered and routed to `Config.OnError` or the configured logger.
+- callbacks run on package-owned goroutines
+- `OpRename` can degrade to remove plus create when a backend cannot pair both sides
+- callback panics are recovered and forwarded to `Config.OnError` or the logger
 
-## Config model
+## Config
 
-`Config` is designed to work as a plain struct literal. The package applies defaults automatically, so `Config{}` is valid.
+`Config` is meant to be used as a plain struct literal. `Config{}` is valid.
 
 ```go
 type Config struct {
@@ -110,30 +110,30 @@ type PathInfo struct {
 
 ### Field behavior
 
-- `RecursionDefault` keeps directory watches recursive and file watches non-recursive.
-- `RecursionDisabled` watches only the root directory level.
-- `RecursionEnabled` forces recursive directory enrollment.
-- `ExcludeGlobs`, `ExcludePrefixes`, and `Exclude` are applied both when the watch is created and when events are delivered.
-- `OnEvent` receives normalized events that survive filtering.
-- `OnError` receives runtime watcher errors and recovered handler panics.
-- `Logger` replaces the fallback logger used when handlers are omitted.
-- `Ops = 0` means all operations.
-- `OpOverflow` is always retained and cannot be disabled.
-- `QueueCapacity <= 0` falls back to the package default queue depth.
-- `FollowSymlinks` opts into accepting symlink roots.
+- `RecursionDefault` keeps directory watches recursive and file watches non-recursive
+- `RecursionDisabled` watches only the top-level directory
+- `RecursionEnabled` forces recursive directory enrollment
+- `ExcludeGlobs`, `ExcludePrefixes`, and `Exclude` are applied when watches are enrolled and when events are emitted
+- `OnEvent` receives normalized events that survive filtering
+- `OnError` receives runtime watcher errors and recovered handler panics
+- `Logger` is used when handlers are omitted
+- `Ops = 0` means all operations
+- `OpOverflow` is always delivered
+- `QueueCapacity <= 0` falls back to the default queue depth
+- `FollowSymlinks` allows symlink roots
 
-## Sane defaults
+## Defaults
 
-These defaults are applied even when you pass `Config{}`:
+If you pass `Config{}`, Gaze uses these defaults:
 
-- directory watches recurse by default
+- directory watches are recursive
 - file watches stay file-only
 - all event ops are enabled
-- queue capacity defaults to `1024`
+- queue capacity is `1024`
 - fallback logging uses `slog.Default()`
 - symlink roots are rejected unless `FollowSymlinks` is true
 
-## Example config
+## Example
 
 ```go
 logger := slog.Default()
@@ -145,8 +145,8 @@ cfg := gaze.Config{
 	Exclude: func(info gaze.PathInfo) bool {
 		return info.IsDir && info.Base == "vendor"
 	},
-	Ops:           gaze.OpCreate | gaze.OpWrite | gaze.OpRename,
-	QueueCapacity: 4096,
+	Ops:            gaze.OpCreate | gaze.OpWrite | gaze.OpRename,
+	QueueCapacity:  4096,
 	FollowSymlinks: false,
 	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)

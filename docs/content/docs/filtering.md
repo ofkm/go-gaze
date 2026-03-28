@@ -4,12 +4,12 @@ description: "Exclude paths before they are watched and before events are emitte
 weight: 3
 ---
 
-Filtering is applied in two places:
+Filtering happens in two places:
 
-1. during watch enrollment, so excluded directories are not walked or enrolled recursively
-2. during event dispatch, so excluded paths do not reach your handlers
+1. when Gaze is deciding what to watch
+2. when Gaze is deciding what events to deliver
 
-That keeps kernel watch count and callback load down on large trees.
+That matters for large trees. Good filters reduce both watch count and callback noise.
 
 ## Glob excludes
 
@@ -25,8 +25,8 @@ if err != nil {
 }
 ```
 
-- glob patterns match base names and relevant path segments
-- narrower patterns are easier to reason about than broad wildcards
+- globs match base names and, where it makes sense, path segments
+- smaller, specific patterns are usually easier to reason about than broad wildcards
 
 ## Prefix excludes
 
@@ -45,7 +45,7 @@ if err != nil {
 }
 ```
 
-Prefix excludes are best for large trees you never want to enroll at all.
+Use prefix excludes for directories you never want to watch at all.
 
 ## Predicate excludes
 
@@ -63,7 +63,7 @@ if err != nil {
 }
 ```
 
-Use `Exclude` when the decision depends on path state that globs and fixed prefixes cannot express cleanly.
+Use `Exclude` when globs and prefixes are not quite enough.
 
 ## Op filtering
 
@@ -82,9 +82,9 @@ if err != nil {
 ```
 
 - `cfg.Ops = 0` means all operations
-- `OpOverflow` is always retained because it signals lost fidelity
+- `OpOverflow` is always delivered
 - op filtering happens after backend normalization and rename pairing
 
-## Excludes and correctness
+## A practical note
 
-Excludes reduce noise and watch pressure, but they also mean you are intentionally not observing some transitions. If exact external state matters, combine excludes with reconciliation scans when you receive `OpOverflow`.
+Filtering makes watchers cheaper and quieter, but it also means you are intentionally ignoring part of the tree. If exact external state matters, combine filtering with reconciliation when you receive `OpOverflow`.

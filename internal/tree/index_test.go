@@ -28,4 +28,70 @@ func TestIndexMatchesAndMovePrefix(t *testing.T) {
 	if index.Matches("/root/a/b.txt") {
 		t.Fatal("old recursive root path still matched after move")
 	}
+
+	if removed, ok := index.Remove("/flat/file.txt"); !ok || removed.Path != "/flat/file.txt" {
+		t.Fatalf("Remove(file root) = (%+v, %v), want removed file root", removed, ok)
+	}
+	if _, ok := index.Remove("/missing"); ok {
+		t.Fatal("Remove(missing) = ok, want false")
+	}
+}
+
+func TestJoinMovedPath(t *testing.T) {
+	if got := joinMovedPath("/old/child/file.txt", "/old", "/new"); got != "/new/child/file.txt" {
+		t.Fatalf("joinMovedPath() = %q, want %q", got, "/new/child/file.txt")
+	}
+}
+
+func TestIndexMovePrefixRewritesNestedAndExactMatches(t *testing.T) {
+	idx := New()
+	if err := idx.Add(Root{Path: "/tmp/project", WatchPath: "/tmp/project", IsDir: true, Recursive: true}); err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if err := idx.Add(Root{Path: "/tmp/project/nested", WatchPath: "/tmp/project/nested", IsDir: true, Recursive: true}); err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if err := idx.Add(Root{Path: "/tmp/project-file"}); err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	idx.MovePrefix("/tmp/project", "/tmp/renamed")
+
+	if !idx.Matches("/tmp/renamed") {
+		t.Fatal("expected exact moved root to match")
+	}
+	if !idx.Matches("/tmp/renamed/nested/child.txt") {
+		t.Fatal("expected nested moved directory to match descendants")
+	}
+	if idx.Matches("/tmp/project/nested/child.txt") {
+		t.Fatal("did not expect old nested directory to keep matching")
+	}
+	if idx.Matches("/tmp/renamed-file") {
+		t.Fatal("did not expect sibling path to be rewritten")
+	}
+	if !idx.Matches("/tmp/project-file") {
+		t.Fatal("expected unrelated sibling root to remain")
+	}
+}
+
+func TestIndexMovePrefixIgnoresUnrelatedPrefix(t *testing.T) {
+	idx := New()
+	if err := idx.Add(Root{Path: "/workspace/root", Recursive: true}); err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+
+	idx.MovePrefix("/workspace/other", "/workspace/new")
+
+	if !idx.Matches("/workspace/root") {
+		t.Fatal("expected unrelated move to leave existing root intact")
+	}
+}
+
+func TestJoinMovedPathExactAndNested(t *testing.T) {
+	if got := joinMovedPath("/tmp/old", "/tmp/old", "/tmp/new"); got != "/tmp/new" {
+		t.Fatalf("joinMovedPath() = %q, want %q", got, "/tmp/new")
+	}
+	if got := joinMovedPath("/tmp/old/nested/file.txt", "/tmp/old", "/tmp/new"); got != "/tmp/new/nested/file.txt" {
+		t.Fatalf("joinMovedPath() = %q, want %q", got, "/tmp/new/nested/file.txt")
+	}
 }

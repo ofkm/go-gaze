@@ -59,7 +59,3 @@ description = "Gaze is a Pure-Go cross-platform file system watcher."
     name = "Module"
     url = "https://pkg.go.dev/go.ofkm.dev/gaze"
     weight = 2
-  [[menu.sidebar]]
-    name = "Example App"
-    pageRef = "/docs/examples"
-    weight = 3

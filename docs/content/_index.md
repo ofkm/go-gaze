@@ -1,20 +1,20 @@
 ---
-title: "Gaze"
-description: "Pure-Go file watching for Go."
+title: 'Gaze'
+description: 'Gaze is a pure-Go filesystem watcher for Linux, macOS, and Windows.'
 toc: false
 sidebar:
   hide: true
 ---
 
-`go.ofkm.dev/gaze` is Gaze, a public Go package for filesystem events on Linux, macOS, and Windows with no CGO dependency.
+Gaze watches files and directories without cgo. It uses the native backend for each platform, keeps the API small, and normalizes the events you get back.
 
-The easiest way to use it is through a single entrypoint:
+If you just want to start watching a directory, this is enough:
 
 ```go
 w, err := gaze.WatchDirectory("my-directory")
 ```
 
-When you need more control, build a config value and pass it to the matching `...WithConfig` constructor:
+If you need filters or callbacks, pass a config:
 
 ```go
 cfg := gaze.Config{
@@ -27,26 +27,20 @@ cfg := gaze.Config{
 w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 ```
 
-Gaze is opinionated so it stays easy to use in production.
+A few things to know up front:
 
-- pure Go implementation with per-platform native backends
-- directory watching is recursive by default
-- filtering applies both when watches are enrolled and when events are delivered
-- events are normalized, including rename pairing and overflow detection
-- the package owns its goroutines, so your code only handles callbacks
-- overflow is reported explicitly instead of being dropped silently
+- it is pure Go, with native backends for Linux, macOS, and Windows
+- directory watches are recursive by default
+- filtering happens both when watches are enrolled and when events are delivered
+- rename and overflow events are normalized into one event model
+- the package manages its own goroutines
+- if you do not provide handlers, events and errors are logged with `slog`
 
 ## Start here
 
-- [Quickstart](/docs/quickstart) for the minimal setup.
-- [API](/docs/api) for constructors, methods, and full config surface.
-- [Filtering](/docs/filtering) for glob/prefix/predicate excludes and opcode filtering.
-- [Platforms](/docs/platforms) for backend behavior and tradeoffs.
-- [Examples](/docs/examples) for practical patterns.
-
-## What to expect
-
-- callbacks always run in package-owned goroutines
-- `Config.OnError` receives callback failures and runtime watcher errors
-- if you do not provide handlers, Gaze logs events and errors with `slog`
-- `Config.Logger` replaces the default logger used by that fallback path
+- [Quickstart](/docs/quickstart) for the smallest working setup
+- [API](/docs/api) for constructors, config fields, and lifecycle methods
+- [Filtering](/docs/filtering) for glob, prefix, predicate, and op filters
+- [Platforms](/docs/platforms) for backend behavior and tradeoffs
+- [Examples](/docs/examples) for common usage patterns
+- [Performance](/docs/performance) for benchmark notes and current numbers

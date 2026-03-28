@@ -64,3 +64,19 @@ func TestQueueCloseUnblocksWaiters(t *testing.T) {
 		t.Fatal("Pop waiter did not unblock on Close")
 	}
 }
+
+func TestQueueMinimumCapacityAndPushAfterClose(t *testing.T) {
+	q := New[int](0)
+
+	if !q.Push(1) {
+		t.Fatal("Push() = false, want true before Close")
+	}
+	if got, ok := q.Pop(); !ok || got != 1 {
+		t.Fatalf("Pop() = (%d, %v), want (1, true)", got, ok)
+	}
+
+	q.Close()
+	if q.Push(2) {
+		t.Fatal("Push() after Close = true, want false")
+	}
+}
