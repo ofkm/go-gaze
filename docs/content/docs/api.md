@@ -138,17 +138,17 @@ These defaults are applied even when you pass `Config{}`:
 ```go
 logger := slog.Default()
 
-cfg := gofilewatch.Config{
-	Recursion:       gofilewatch.RecursionEnabled,
+cfg := gaze.Config{
+	Recursion:       gaze.RecursionEnabled,
 	ExcludeGlobs:    []string{"*.tmp", "*.swp", ".DS_Store"},
 	ExcludePrefixes: []string{"/srv/app/.git", "/srv/app/node_modules"},
-	Exclude: func(info gofilewatch.PathInfo) bool {
+	Exclude: func(info gaze.PathInfo) bool {
 		return info.IsDir && info.Base == "vendor"
 	},
-	Ops:           gofilewatch.OpCreate | gofilewatch.OpWrite | gofilewatch.OpRename,
+	Ops:           gaze.OpCreate | gaze.OpWrite | gaze.OpRename,
 	QueueCapacity: 4096,
 	FollowSymlinks: false,
-	OnEvent: func(evt gofilewatch.Event) {
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 	OnError: func(err error) {
@@ -157,7 +157,7 @@ cfg := gofilewatch.Config{
 	Logger: logger,
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 if err != nil {
 	panic(err)
 }

@@ -1,15 +1,15 @@
-baseURL = "https://go.ofkm.dev/gaze/"
+baseURL = "https://gaze.ofkm.dev/"
 languageCode = "en-us"
 title = "Gaze"
 enableRobotsTXT = true
-disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
+disableKinds = ["taxonomy", "term", "rss", "sitemap"]
 
 [module]
   [[module.imports]]
     path = "github.com/imfing/hextra"
 
 [params]
-description = "Gaze is a pure-Go cross-platform file system watcher with no CGO."
+description = "Gaze is a Pure-Go cross-platform file system watcher."
 
   [params.navbar]
   displayTitle = true

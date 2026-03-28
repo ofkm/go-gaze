@@ -1,10 +1,10 @@
-package filewatch_test
+package gaze_test
 
 import (
 	"fmt"
 	"os"
 
-	gofilewatch "go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze"
 )
 
 func ExampleWatchDirectory() {
@@ -16,10 +16,10 @@ func ExampleWatchDirectory() {
 		_ = os.RemoveAll(root)
 	}()
 
-	events := make(chan gofilewatch.Event, 1)
-	cfg := gofilewatch.Config{
+	events := make(chan gaze.Event, 1)
+	cfg := gaze.Config{
 		ExcludeGlobs: []string{"*.tmp"},
-		OnEvent: func(evt gofilewatch.Event) {
+		OnEvent: func(evt gaze.Event) {
 			select {
 			case events <- evt:
 			default:
@@ -27,7 +27,7 @@ func ExampleWatchDirectory() {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		panic(err)
 	}

@@ -14,12 +14,12 @@ That keeps both kernel watch count and callback load down on large trees.
 ## Glob excludes
 
 ```go
-cfg := gofilewatch.Config{
+cfg := gaze.Config{
 	ExcludeGlobs: []string{"*.tmp", "*.swp", ".DS_Store"},
-	OnEvent: func(gofilewatch.Event) {},
+	OnEvent: func(gaze.Event) {},
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -31,15 +31,15 @@ if err != nil {
 ## Prefix excludes
 
 ```go
-cfg := gofilewatch.Config{
+cfg := gaze.Config{
 	ExcludePrefixes: []string{
 		"/absolute/path/to/my-directory/.git",
 		"/absolute/path/to/my-directory/node_modules",
 	},
-	OnEvent: func(gofilewatch.Event) {},
+	OnEvent: func(gaze.Event) {},
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -50,14 +50,14 @@ Prefix excludes are ideal for large trees you never want to enroll at all.
 ## Predicate excludes
 
 ```go
-cfg := gofilewatch.Config{
-	Exclude: func(info gofilewatch.PathInfo) bool {
+cfg := gaze.Config{
+	Exclude: func(info gaze.PathInfo) bool {
 		return info.IsDir && info.Base == "vendor"
 	},
-	OnEvent: func(gofilewatch.Event) {},
+	OnEvent: func(gaze.Event) {},
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -68,14 +68,14 @@ Use `Exclude` when the decision depends on path state that globs and fixed prefi
 ## Op filtering
 
 ```go
-cfg := gofilewatch.Config{
-	Ops: gofilewatch.OpCreate | gofilewatch.OpWrite | gofilewatch.OpRename,
-	OnEvent: func(evt gofilewatch.Event) {
+cfg := gaze.Config{
+	Ops: gaze.OpCreate | gaze.OpWrite | gaze.OpRename,
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 if err != nil {
 	panic(err)
 }

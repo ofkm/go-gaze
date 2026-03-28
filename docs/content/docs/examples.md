@@ -26,17 +26,17 @@ import (
 	"path/filepath"
 	"syscall"
 
-	gofilewatch "go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze"
 )
 
 func main() {
 	logger := slog.Default()
 	stop := make(chan os.Signal, 1)
 
-	cfg := gofilewatch.Config{
+	cfg := gaze.Config{
 		ExcludeGlobs:    []string{"*.tmp", "*.swp", ".DS_Store"},
 		ExcludePrefixes: []string{filepath.Join(".", ".git")},
-		OnEvent: func(evt gofilewatch.Event) {
+		OnEvent: func(evt gaze.Event) {
 			fmt.Println(evt.Op, evt.Path)
 		},
 		OnError: func(err error) {
@@ -44,7 +44,7 @@ func main() {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(".", cfg)
+	w, err := gaze.WatchDirectoryWithConfig(".", cfg)
 	if err != nil {
 		logger.Error("watch directory", "err", err)
 		os.Exit(1)
@@ -63,13 +63,13 @@ func main() {
 ## 2) Watch a single file
 
 ```go
-cfg := gofilewatch.Config{
-	OnEvent: func(evt gofilewatch.Event) {
+cfg := gaze.Config{
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 }
 
-w, err := gofilewatch.WatchFileWithConfig("config.yaml", cfg)
+w, err := gaze.WatchFileWithConfig("config.yaml", cfg)
 if err != nil {
 	panic(err)
 }
@@ -83,8 +83,8 @@ defer func() {
 ## 3) Multi-root watcher with dynamic add/remove
 
 ```go
-cfg := gofilewatch.Config{
-	OnEvent: func(evt gofilewatch.Event) {
+cfg := gaze.Config{
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 	OnError: func(err error) {
@@ -92,7 +92,7 @@ cfg := gofilewatch.Config{
 	},
 }
 
-w, err := gofilewatch.NewWithConfig(cfg)
+w, err := gaze.NewWithConfig(cfg)
 if err != nil {
 	panic(err)
 }
@@ -116,14 +116,14 @@ if err := w.Remove("/srv/app/config"); err != nil {
 ## 4) Op filtering
 
 ```go
-cfg := gofilewatch.Config{
-	Ops: gofilewatch.OpCreate | gofilewatch.OpRemove | gofilewatch.OpRename,
-	OnEvent: func(evt gofilewatch.Event) {
+cfg := gaze.Config{
+	Ops: gaze.OpCreate | gaze.OpRemove | gaze.OpRename,
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println("interesting:", evt.Op, evt.Path)
 	},
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -133,11 +133,11 @@ if err != nil {
 
 ```go
 logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-cfg := gofilewatch.Config{
+cfg := gaze.Config{
 	Logger: logger,
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -148,14 +148,14 @@ Without handlers, Gaze writes events and internal errors to the configured logge
 ## 6) Follow symlinks intentionally
 
 ```go
-cfg := gofilewatch.Config{
+cfg := gaze.Config{
 	FollowSymlinks: true,
-	OnEvent: func(evt gofilewatch.Event) {
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("link-or-tree-root", cfg)
+w, err := gaze.WatchDirectoryWithConfig("link-or-tree-root", cfg)
 if err != nil {
 	panic(err)
 }
@@ -164,7 +164,7 @@ if err != nil {
 ## 7) Rename and overflow awareness
 
 ```go
-if evt.Op&gofilewatch.OpRename != 0 {
+if evt.Op&gaze.OpRename != 0 {
 	if evt.OldPath != "" {
 		fmt.Printf("renamed %s -> %s\n", evt.OldPath, evt.Path)
 	} else {
@@ -172,7 +172,7 @@ if evt.Op&gofilewatch.OpRename != 0 {
 	}
 }
 
-if evt.Op&gofilewatch.OpOverflow != 0 {
+if evt.Op&gaze.OpOverflow != 0 {
 	fmt.Println("overflow detected, rebuild expected state")
 }
 ```

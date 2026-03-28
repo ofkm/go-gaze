@@ -1,4 +1,4 @@
-package filewatch
+package gaze
 
 import "strings"
 

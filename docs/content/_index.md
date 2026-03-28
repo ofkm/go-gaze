@@ -11,20 +11,20 @@ sidebar:
 It is designed around a very simple entrypoint:
 
 ```go
-w, err := filewatch.WatchDirectory("my-directory")
+w, err := gaze.WatchDirectory("my-directory")
 ```
 
 When you need explicit configuration, construct a real config value and pass it to the matching `...WithConfig` constructor:
 
 ```go
-cfg := filewatch.Config{
+cfg := gaze.Config{
 	ExcludeGlobs: []string{"*.tmp", ".DS_Store"},
-	OnEvent: func(evt filewatch.Event) {
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 }
 
-w, err := filewatch.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 ```
 
 The package is intentionally opinionated for easy production use.

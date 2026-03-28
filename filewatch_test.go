@@ -1,4 +1,4 @@
-package filewatch_test
+package gaze_test
 
 import (
 	"errors"
@@ -8,17 +8,17 @@ import (
 	"testing"
 	"time"
 
-	gofilewatch "go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze"
 )
 
 func TestWatchDirectoryLifecycle(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	events := make(chan gofilewatch.Event, 32)
+	events := make(chan gaze.Event, 32)
 	errs := make(chan error, 32)
-	cfg := gofilewatch.Config{
-		OnEvent: func(evt gofilewatch.Event) {
+	cfg := gaze.Config{
+		OnEvent: func(evt gaze.Event) {
 			events <- evt
 		},
 		OnError: func(err error) {
@@ -26,7 +26,7 @@ func TestWatchDirectoryLifecycle(t *testing.T) {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -40,22 +40,22 @@ func TestWatchDirectoryLifecycle(t *testing.T) {
 	if err := os.WriteFile(target, []byte("one"), 0o644); err != nil {
 		t.Fatalf("WriteFile(create) error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gofilewatch.Event) bool {
-		return evt.Path == target && evt.Op.Has(gofilewatch.OpCreate)
+	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
+		return evt.Path == target && evt.Op.Has(gaze.OpCreate)
 	})
 
 	if err := os.WriteFile(target, []byte("two"), 0o644); err != nil {
 		t.Fatalf("WriteFile(update) error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gofilewatch.Event) bool {
-		return evt.Path == target && evt.Op.Has(gofilewatch.OpWrite)
+	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
+		return evt.Path == target && evt.Op.Has(gaze.OpWrite)
 	})
 
 	if err := os.Remove(target); err != nil {
 		t.Fatalf("Remove() error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gofilewatch.Event) bool {
-		return evt.Path == target && evt.Op.Has(gofilewatch.OpRemove)
+	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
+		return evt.Path == target && evt.Op.Has(gaze.OpRemove)
 	})
 }
 
@@ -63,11 +63,11 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	events := make(chan gofilewatch.Event, 32)
+	events := make(chan gaze.Event, 32)
 	errs := make(chan error, 32)
-	cfg := gofilewatch.Config{
+	cfg := gaze.Config{
 		ExcludeGlobs: []string{"*.tmp"},
-		OnEvent: func(evt gofilewatch.Event) {
+		OnEvent: func(evt gaze.Event) {
 			events <- evt
 		},
 		OnError: func(err error) {
@@ -75,7 +75,7 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -89,23 +89,23 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 	if err := os.Mkdir(subdir, 0o755); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gofilewatch.Event) bool {
-		return evt.Path == subdir && evt.IsDir && evt.Op.Has(gofilewatch.OpCreate)
+	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
+		return evt.Path == subdir && evt.IsDir && evt.Op.Has(gaze.OpCreate)
 	})
 
 	nested := filepath.Join(subdir, "keep.txt")
 	if err := os.WriteFile(nested, []byte("hello"), 0o644); err != nil {
 		t.Fatalf("WriteFile(nested) error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gofilewatch.Event) bool {
-		return evt.Path == nested && evt.Op.Has(gofilewatch.OpCreate)
+	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
+		return evt.Path == nested && evt.Op.Has(gaze.OpCreate)
 	})
 
 	excluded := filepath.Join(root, "skip.tmp")
 	if err := os.WriteFile(excluded, []byte("nope"), 0o644); err != nil {
 		t.Fatalf("WriteFile(excluded) error = %v", err)
 	}
-	assertNoEvent(t, events, errs, func(evt gofilewatch.Event) bool {
+	assertNoEvent(t, events, errs, func(evt gaze.Event) bool {
 		return evt.Path == excluded
 	})
 }
@@ -114,11 +114,11 @@ func TestWatchDirectoryNonRecursive(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	events := make(chan gofilewatch.Event, 32)
+	events := make(chan gaze.Event, 32)
 	errs := make(chan error, 32)
-	cfg := gofilewatch.Config{
-		Recursion: gofilewatch.RecursionDisabled,
-		OnEvent: func(evt gofilewatch.Event) {
+	cfg := gaze.Config{
+		Recursion: gaze.RecursionDisabled,
+		OnEvent: func(evt gaze.Event) {
 			events <- evt
 		},
 		OnError: func(err error) {
@@ -126,7 +126,7 @@ func TestWatchDirectoryNonRecursive(t *testing.T) {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectoryWithConfig() error = %v", err)
 	}
@@ -140,15 +140,15 @@ func TestWatchDirectoryNonRecursive(t *testing.T) {
 	if err := os.Mkdir(subdir, 0o755); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gofilewatch.Event) bool {
-		return evt.Path == subdir && evt.IsDir && evt.Op.Has(gofilewatch.OpCreate)
+	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
+		return evt.Path == subdir && evt.IsDir && evt.Op.Has(gaze.OpCreate)
 	})
 
 	nested := filepath.Join(subdir, "child.txt")
 	if err := os.WriteFile(nested, []byte("hello"), 0o644); err != nil {
 		t.Fatalf("WriteFile(nested) error = %v", err)
 	}
-	assertNoEvent(t, events, errs, func(evt gofilewatch.Event) bool {
+	assertNoEvent(t, events, errs, func(evt gaze.Event) bool {
 		return evt.Path == nested
 	})
 }
@@ -158,10 +158,10 @@ func TestWatchDirectoryOnEvent(t *testing.T) {
 
 	root := t.TempDir()
 
-	received := make(chan gofilewatch.Event, 8)
+	received := make(chan gaze.Event, 8)
 	errs := make(chan error, 8)
-	cfg := gofilewatch.Config{
-		OnEvent: func(evt gofilewatch.Event) {
+	cfg := gaze.Config{
+		OnEvent: func(evt gaze.Event) {
 			received <- evt
 		},
 		OnError: func(err error) {
@@ -169,7 +169,7 @@ func TestWatchDirectoryOnEvent(t *testing.T) {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -188,7 +188,7 @@ func TestWatchDirectoryOnEvent(t *testing.T) {
 	for {
 		select {
 		case evt := <-received:
-			if evt.Path == target && evt.Op.Has(gofilewatch.OpCreate) {
+			if evt.Path == target && evt.Op.Has(gaze.OpCreate) {
 				select {
 				case err := <-errs:
 					t.Fatalf("unexpected watcher error: %v", err)
@@ -211,8 +211,8 @@ func TestWatchDirectoryOnEventPanicBecomesError(t *testing.T) {
 
 	var once sync.Once
 	errs := make(chan error, 8)
-	cfg := gofilewatch.Config{
-		OnEvent: func(gofilewatch.Event) {
+	cfg := gaze.Config{
+		OnEvent: func(gaze.Event) {
 			once.Do(func() {
 				panic("boom")
 			})
@@ -222,7 +222,7 @@ func TestWatchDirectoryOnEventPanicBecomesError(t *testing.T) {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -247,7 +247,7 @@ func TestWatchDirectoryOnEventPanicBecomesError(t *testing.T) {
 	}
 }
 
-func waitForEvent(t *testing.T, events <-chan gofilewatch.Event, errs <-chan error, match func(gofilewatch.Event) bool) {
+func waitForEvent(t *testing.T, events <-chan gaze.Event, errs <-chan error, match func(gaze.Event) bool) {
 	t.Helper()
 
 	deadline := time.After(5 * time.Second)
@@ -267,7 +267,7 @@ func waitForEvent(t *testing.T, events <-chan gofilewatch.Event, errs <-chan err
 	}
 }
 
-func assertNoEvent(t *testing.T, events <-chan gofilewatch.Event, errs <-chan error, match func(gofilewatch.Event) bool) {
+func assertNoEvent(t *testing.T, events <-chan gaze.Event, errs <-chan error, match func(gaze.Event) bool) {
 	t.Helper()
 
 	timeout := time.After(400 * time.Millisecond)

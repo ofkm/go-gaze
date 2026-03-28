@@ -23,11 +23,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	gofilewatch "go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze"
 )
 
 func main() {
-	w, err := gofilewatch.WatchDirectory("my-directory")
+	w, err := gaze.WatchDirectory("my-directory")
 	if err != nil {
 		slog.Default().Error("watch directory", "path", "my-directory", "err", err)
 		os.Exit(1)
@@ -58,14 +58,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	gofilewatch "go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze"
 )
 
 func main() {
 	logger := slog.Default()
-	cfg := gofilewatch.Config{
+	cfg := gaze.Config{
 		ExcludeGlobs: []string{"*.tmp", "*.swp", ".DS_Store"},
-		OnEvent: func(evt gofilewatch.Event) {
+		OnEvent: func(evt gaze.Event) {
 			fmt.Printf("%s %s\n", evt.Op, evt.Path)
 		},
 		OnError: func(err error) {
@@ -73,7 +73,7 @@ func main() {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig("my-directory", cfg)
+	w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 	if err != nil {
 		logger.Error("watch directory", "path", "my-directory", "err", err)
 		os.Exit(1)
@@ -93,13 +93,13 @@ func main() {
 ## Watch a single file
 
 ```go
-cfg := gofilewatch.Config{
-	OnEvent: func(evt gofilewatch.Event) {
+cfg := gaze.Config{
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 }
 
-w, err := gofilewatch.WatchFileWithConfig("config.yaml", cfg)
+w, err := gaze.WatchFileWithConfig("config.yaml", cfg)
 if err != nil {
 	panic(err)
 }
@@ -114,17 +114,17 @@ defer func() {
 
 ## Disable recursion explicitly
 
-`WatchDirectory` is recursive by default. To watch only the top-level directory, set `Recursion: gofilewatch.RecursionDisabled`.
+`WatchDirectory` is recursive by default. To watch only the top-level directory, set `Recursion: gaze.RecursionDisabled`.
 
 ```go
-cfg := gofilewatch.Config{
-	Recursion: gofilewatch.RecursionDisabled,
-	OnEvent: func(evt gofilewatch.Event) {
+cfg := gaze.Config{
+	Recursion: gaze.RecursionDisabled,
+	OnEvent: func(evt gaze.Event) {
 		fmt.Println(evt.Op, evt.Path)
 	},
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("/srv/app", cfg)
+w, err := gaze.WatchDirectoryWithConfig("/srv/app", cfg)
 if err != nil {
 	panic(err)
 }
@@ -135,11 +135,11 @@ if err != nil {
 Symlink roots are rejected unless you opt in.
 
 ```go
-cfg := gofilewatch.Config{
+cfg := gaze.Config{
 	FollowSymlinks: true,
 }
 
-w, err := gofilewatch.WatchDirectoryWithConfig("./relative/path", cfg)
+w, err := gaze.WatchDirectoryWithConfig("./relative/path", cfg)
 if err != nil {
 	panic(err)
 }

@@ -1,4 +1,4 @@
-package filewatch_test
+package gaze_test
 
 import (
 	"os"
@@ -6,17 +6,17 @@ import (
 	"strconv"
 	"testing"
 
-	gofilewatch "go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze"
 )
 
 func BenchmarkWatchDirectoryCreateRemove(b *testing.B) {
 	root := b.TempDir()
-	cfg := gofilewatch.Config{
-		OnEvent: func(gofilewatch.Event) {},
+	cfg := gaze.Config{
+		OnEvent: func(gaze.Event) {},
 		OnError: func(error) {},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
 	if err != nil {
 		b.Fatalf("WatchDirectory() error = %v", err)
 	}

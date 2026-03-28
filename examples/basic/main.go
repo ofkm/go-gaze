@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	gofilewatch "go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze"
 )
 
 func main() {
@@ -25,10 +25,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg := gofilewatch.Config{
+	cfg := gaze.Config{
 		ExcludeGlobs:    []string{"*.tmp", "*.swp", ".DS_Store"},
 		ExcludePrefixes: []string{filepath.Join(absTarget, ".git")},
-		OnEvent: func(evt gofilewatch.Event) {
+		OnEvent: func(evt gaze.Event) {
 			if evt.OldPath != "" {
 				fmt.Printf("%s %s -> %s dir=%t\n", evt.Op, evt.OldPath, evt.Path, evt.IsDir)
 				return
@@ -40,7 +40,7 @@ func main() {
 		},
 	}
 
-	w, err := gofilewatch.WatchDirectoryWithConfig(absTarget, cfg)
+	w, err := gaze.WatchDirectoryWithConfig(absTarget, cfg)
 	if err != nil {
 		logger.Error("watch directory", "path", absTarget, "err", err)
 		os.Exit(1)
