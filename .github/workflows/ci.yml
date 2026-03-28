@@ -19,10 +19,10 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+      - name: Run Golangci-lint
+        uses: golangci/golangci-lint-action@v9
         with:
-          args: --timeout=5m
+          version: latest
 
       - name: Run tests
         run: go test ./...
