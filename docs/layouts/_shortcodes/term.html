@@ -1,0 +1,34 @@
+{{- /*
+Highlight a glossary term
+
+@param {string} entry Either the glossary abbreviation or the term.
+
+or
+
+@param {string} 0 Either the glossary abbreviation or the term.
+
+@example {{< term entry="MAC" >}}
+@example {{< term "MAC" >}}
+*/ -}}
+
+{{- $entry := .Get "entry" | default (.Get 0) -}}
+{{- $entryLower := lower $entry -}}
+{{- $match := dict -}}
+
+{{- $terms := index hugo.Data .Site.Language.Lang "termbase" -}}
+
+<!-- Go over the term data file - data/<lang>/termbase.yaml -->
+{{- range $terms -}}
+  {{- if or (eq (lower .abbr) $entryLower) (eq (lower .term) $entryLower) -}}
+    {{- $match = . -}}
+    {{- break -}}
+  {{- end -}}
+{{- end -}}
+
+{{- with $match }}
+  <abbr title="{{ .definition | plainify }}">
+    {{- $entry -}}
+  </abbr>
+{{- else }}
+  {{- $entry -}}
+{{- end }}

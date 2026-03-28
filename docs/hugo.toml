@@ -1,0 +1,65 @@
+baseURL = "https://go.ofkm.dev/filewatch/"
+languageCode = "en-us"
+title = "go-filewatch"
+enableRobotsTXT = true
+disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
+
+[module]
+  [[module.imports]]
+    path = "github.com/imfing/hextra"
+
+[params]
+description = "Pure-Go cross-platform file system events with no CGO."
+
+  [params.navbar]
+  displayTitle = true
+  displayLogo = false
+  width = "wide"
+
+  [params.page]
+  width = "wide"
+  displayPagination = true
+
+  [params.theme]
+  default = "system"
+  displayToggle = true
+
+  [params.search]
+  type = "flexsearch"
+
+[markup]
+  [markup.highlight]
+    noClasses = false
+    style = "github"
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+
+[menu]
+  [[menu.main]]
+    name = "Docs"
+    pageRef = "/docs"
+    weight = 1
+  [[menu.main]]
+    name = "Examples"
+    pageRef = "/docs/examples"
+    weight = 2
+  [[menu.main]]
+    name = "Search"
+    weight = 3
+    [menu.main.params]
+      type = "search"
+
+  [[menu.sidebar]]
+    name = "Resources"
+    weight = 1
+    [menu.sidebar.params]
+      type = "separator"
+  [[menu.sidebar]]
+    name = "Module"
+    url = "https://pkg.go.dev/go.ofkm.dev/filewatch"
+    weight = 2
+  [[menu.sidebar]]
+    name = "Example App"
+    pageRef = "/docs/examples"
+    weight = 3
