@@ -3,29 +3,32 @@ title: Performance
 weight: 6
 ---
 
-Gaze includes a small benchmark suite. It is there to catch regressions and make changes easier to compare over time, not to claim a single universal performance number.
+Gaze includes a small benchmark suite. The point is to watch trend lines across platforms, not to pretend one machine tells the whole story.
 
-Run it with:
+Run the local suite with:
 
 ```sh
-go test ./... -bench=. -benchmem
+go test ./... -run=^$ -bench=. -benchmem
 ```
 
-Current local numbers from `darwin/arm64`:
+The committed numbers below are generated from the `Benchmarks` GitHub Actions workflow. That workflow runs the same benchmark suite on Linux, macOS, and Windows, then rewrites this page with the latest published results.
 
-| Benchmark                             | Result                                      |
-| ------------------------------------- | ------------------------------------------- |
-| `BenchmarkWatchDirectoryCreateRemove` | `170497 ns/op`, `5001 B/op`, `36 allocs/op` |
-| `BenchmarkOpString`                   | `77.34 ns/op`, `96 B/op`, `2 allocs/op`     |
-| `BenchmarkFilterShouldExclude`        | `454.1 ns/op`, `0 B/op`, `0 allocs/op`      |
-| `BenchmarkTreeMatches`                | `138.2 ns/op`, `0 B/op`, `0 allocs/op`      |
+## Latest published results
 
-How to read that table:
+### `darwin/arm64`
 
-- `BenchmarkWatchDirectoryCreateRemove` includes real watcher setup and teardown, so it is closer to integration work than a tight microbenchmark
-- the filter and tree benchmarks are effectively allocation-free in steady state
-- the absolute numbers will change with hardware, OS, filesystem, and Go version
+CPU: `Apple M1 Max`
 
-The useful signal is trend, not the exact number. If a change noticeably moves allocations or runtime, that is worth looking at.
+| Benchmark | ns/op | B/op | allocs/op |
+| --- | ---: | ---: | ---: |
+| `BenchmarkWatchDirectoryCreateRemove` | `146887 ns/op` | `4617 B/op` | `32 allocs/op` |
+| `BenchmarkOpString` | `0.3328 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkFilterShouldExclude` | `451.6 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMatches` | `135.6 ns/op` | `0 B/op` | `0 allocs/op` |
 
-If you want to publish fresh numbers, rerun the command on the platform you care about and update this page with the new output.
+How to read this page:
+
+- `BenchmarkWatchDirectoryCreateRemove` is closest to real watcher work. It includes filesystem activity and backend event handling, so it is not a pure microbenchmark.
+- `BenchmarkOpString`, `BenchmarkFilterShouldExclude`, and `BenchmarkTreeMatches` are tighter hot-path checks.
+- Absolute numbers will move with hardware, runner class, Go version, and filesystem behavior. The useful signal is whether a change moves runtime, allocations, or both.
+- If you want fresh committed numbers, run the `Benchmarks` workflow in GitHub Actions.

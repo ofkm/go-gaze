@@ -1,0 +1,74 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  bench:
+    name: Benchmark (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run benchmarks
+        shell: bash
+        run: go test ./... -run=^$ -bench=. -benchmem | tee benchmark.txt
+
+      - name: Upload benchmark output
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-${{ matrix.os }}
+          path: benchmark.txt
+
+  publish:
+    name: Publish benchmark docs
+    runs-on: ubuntu-latest
+    needs: bench
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: benchmark-artifacts
+
+      - name: Regenerate performance docs
+        shell: bash
+        run: |
+          go run ./scripts/benchmarkdocs docs/content/docs/performance.md benchmark-artifacts/*/benchmark.txt
+
+      - name: Commit performance docs
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/content/docs/performance.md; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/content/docs/performance.md
+          git commit -m "docs: update benchmark matrix"
+          git push

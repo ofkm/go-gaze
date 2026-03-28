@@ -46,6 +46,10 @@ func New(cfg Config) (*Matcher, error) {
 }
 
 func (m *Matcher) ShouldExclude(path string, isDir bool) bool {
+	if len(m.prefixes) == 0 && len(m.globs) == 0 && m.exclude == nil {
+		return false
+	}
+
 	path = filepath.Clean(path)
 
 	for _, prefix := range m.prefixes {

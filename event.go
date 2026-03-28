@@ -1,7 +1,5 @@
 package gaze
 
-import "strings"
-
 type Op uint32
 
 const (
@@ -32,29 +30,48 @@ func (o Op) Has(other Op) bool {
 	return o&other != 0
 }
 
-func (o Op) String() string {
-	if o == 0 {
-		return "none"
+var opStrings = func() [allOps + 1]string {
+	var table [allOps + 1]string
+	table[0] = "none"
+
+	names := [...]struct {
+		op   Op
+		name string
+	}{
+		{op: OpCreate, name: "create"},
+		{op: OpWrite, name: "write"},
+		{op: OpRemove, name: "remove"},
+		{op: OpRename, name: "rename"},
+		{op: OpChmod, name: "chmod"},
+		{op: OpOverflow, name: "overflow"},
 	}
 
-	var parts []string
-	if o.Has(OpCreate) {
-		parts = append(parts, "create")
+	for mask := Op(1); mask <= allOps; mask++ {
+		var buf [48]byte
+		n := 0
+		for _, item := range names {
+			if !mask.Has(item.op) {
+				continue
+			}
+			if n > 0 {
+				buf[n] = '|'
+				n++
+			}
+			n += copy(buf[n:], item.name)
+		}
+		table[mask] = string(buf[:n])
 	}
-	if o.Has(OpWrite) {
-		parts = append(parts, "write")
+
+	return table
+}()
+
+func (o Op) String() string {
+	if o <= allOps {
+		return opStrings[o]
 	}
-	if o.Has(OpRemove) {
-		parts = append(parts, "remove")
+	masked := o & allOps
+	if masked == 0 {
+		return opStrings[0]
 	}
-	if o.Has(OpRename) {
-		parts = append(parts, "rename")
-	}
-	if o.Has(OpChmod) {
-		parts = append(parts, "chmod")
-	}
-	if o.Has(OpOverflow) {
-		parts = append(parts, "overflow")
-	}
-	return strings.Join(parts, "|")
+	return opStrings[masked]
 }

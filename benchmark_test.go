@@ -13,6 +13,7 @@ import (
 
 func BenchmarkWatchDirectoryCreateRemove(b *testing.B) {
 	root := b.TempDir()
+	payload := []byte{'x'}
 	cfg := gaze.Config{
 		OnEvent: func(gaze.Event) {},
 		OnError: func(error) {},
@@ -29,8 +30,10 @@ func BenchmarkWatchDirectoryCreateRemove(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		path := filepath.Join(root, "bench-"+strconv.Itoa(i))
-		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		b.StartTimer()
+		if err := os.WriteFile(path, payload, 0o644); err != nil {
 			b.Fatalf("WriteFile() error = %v", err)
 		}
 		if err := os.Remove(path); err != nil {

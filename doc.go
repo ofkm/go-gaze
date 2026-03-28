@@ -1,4 +1,4 @@
-// Package gaze provides Gaze, a pure-Go filesystem watcher for Linux, macOS,
+// Gaze a pure-Go filesystem watcher for Linux, macOS,
 // and Windows.
 //
 // For the common case, start with a directory watch:
@@ -17,7 +17,7 @@
 //
 //	w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 //
-// Gaze owns the watcher goroutines internally. You can handle events and
+// Gaze owns the watcher goroutines internally. You can handle events an
 // errors with callbacks, or let the package log them through slog.
 //
 // Linux and Windows generally handle large recursive trees best. macOS is

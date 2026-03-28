@@ -81,19 +81,21 @@ func NewWithConfig(cfg Config) (*Watcher, error) {
 }
 
 func newWatcher(cfg Config) (*Watcher, error) {
-	matcher, err := newMatcher(filter.Config{
-		Prefixes: cfg.ExcludePrefixes,
-		Globs:    cfg.ExcludeGlobs,
-		Exclude: func(path string, isDir bool) bool {
-			if cfg.Exclude == nil {
-				return false
-			}
+	var exclude func(string, bool) bool
+	if cfg.Exclude != nil {
+		exclude = func(path string, isDir bool) bool {
 			return cfg.Exclude(PathInfo{
 				Path:  path,
 				Base:  filepath.Base(path),
 				IsDir: isDir,
 			})
-		},
+		}
+	}
+
+	matcher, err := newMatcher(filter.Config{
+		Prefixes: cfg.ExcludePrefixes,
+		Globs:    cfg.ExcludeGlobs,
+		Exclude:  exclude,
 	})
 	if err != nil {
 		return nil, err
@@ -211,12 +213,7 @@ func (w *Watcher) runEvents() {
 }
 
 func (w *Watcher) handleBackendEvent(evt backend.Event) {
-	if evt.Path != "" {
-		evt.Path = filepath.Clean(evt.Path)
-	}
-	if evt.OldPath != "" {
-		evt.OldPath = filepath.Clean(evt.OldPath)
-	}
+	publicOp := Op(evt.Op)
 
 	if evt.Op.Has(backend.OpRename) && evt.Path != "" && evt.OldPath != "" {
 		w.index.MovePrefix(evt.OldPath, evt.Path)
@@ -228,15 +225,15 @@ func (w *Watcher) handleBackendEvent(evt backend.Event) {
 		}
 	}
 
+	if publicOp != OpOverflow && !w.cfg.Ops.Has(publicOp) {
+		return
+	}
+
 	public := Event{
 		Path:    evt.Path,
 		OldPath: evt.OldPath,
-		Op:      Op(evt.Op),
+		Op:      publicOp,
 		IsDir:   evt.IsDir,
-	}
-
-	if public.Op != OpOverflow && !w.cfg.Ops.Has(public.Op) {
-		return
 	}
 
 	if public.Path != "" && w.matcher.ShouldExclude(public.Path, public.IsDir) {
@@ -351,5 +348,5 @@ func (w *Watcher) normalizePath(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Clean(abs), nil
+	return abs, nil
 }
