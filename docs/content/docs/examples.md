@@ -10,10 +10,10 @@ The repository includes a runnable example:
 
 ```bash
 cd examples/basic
-go run . .
+go run .
 ```
 
-## 1) Basic callback watch
+## Basic callback watch
 
 ```go
 package main
@@ -60,7 +60,7 @@ func main() {
 }
 ```
 
-## 2) Watch a single file
+## Watch a single file
 
 ```go
 cfg := gaze.Config{
@@ -80,7 +80,7 @@ defer func() {
 }()
 ```
 
-## 3) Multi-root watcher with dynamic add/remove
+## Multi-root watcher with dynamic add/remove
 
 ```go
 cfg := gaze.Config{
@@ -113,7 +113,7 @@ if err := w.Remove("/srv/app/config"); err != nil {
 }
 ```
 
-## 4) Op filtering
+## Op filtering
 
 ```go
 cfg := gaze.Config{
@@ -129,7 +129,7 @@ if err != nil {
 }
 ```
 
-## 5) Logger-only fallback
+## Logger-only fallback
 
 ```go
 logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -145,7 +145,7 @@ if err != nil {
 
 Without handlers, Gaze writes events and internal errors to the configured logger.
 
-## 6) Follow symlinks intentionally
+## Follow symlinks intentionally
 
 ```go
 cfg := gaze.Config{
@@ -161,7 +161,7 @@ if err != nil {
 }
 ```
 
-## 7) Rename and overflow awareness
+## Rename and overflow awareness
 
 ```go
 if evt.Op&gaze.OpRename != 0 {

@@ -12,7 +12,7 @@ go get go.ofkm.dev/gaze
 
 ## Simplest watch
 
-This is the lowest-friction path. The package owns the watcher goroutines and logs normalized events and internal errors with `slog.Default()`.
+This is the shortest path. Gaze owns the watcher goroutines for you and logs normalized events and internal errors with `slog.Default()` when you do not provide handlers.
 
 ```go
 package main
@@ -46,7 +46,7 @@ func main() {
 
 ## Structured config
 
-When you need filters, callbacks, or logger control, use a plain struct literal with `WatchDirectoryWithConfig`.
+When you need filters, callbacks, or a custom logger, use a plain struct literal with `WatchDirectoryWithConfig`.
 
 ```go
 package main
@@ -110,7 +110,7 @@ defer func() {
 }()
 ```
 
-`WatchFile` and `WatchFileWithConfig` watch the file's parent directory and emit only events for the target file.
+`WatchFile` and `WatchFileWithConfig` watch the file's parent directory and only emit events for the target file.
 
 ## Disable recursion explicitly
 
@@ -147,4 +147,4 @@ if err != nil {
 
 ## Logging fallback
 
-If you omit `Config.OnEvent` and `Config.OnError`, Gaze logs normalized events and runtime errors with `Config.Logger`. If `Config.Logger` is nil, the package uses `slog.Default()`.
+If you leave out `Config.OnEvent` and `Config.OnError`, Gaze logs normalized events and runtime errors with `Config.Logger`. If `Config.Logger` is nil, the package uses `slog.Default()`.

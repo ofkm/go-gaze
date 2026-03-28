@@ -1,20 +1,20 @@
 ---
 title: "Gaze"
-description: "Pure-Go cross-platform file watching for Go."
+description: "Pure-Go file watching for Go."
 toc: false
 sidebar:
   hide: true
 ---
 
-`go.ofkm.dev/gaze` is the Gaze module: a public Go package for filesystem events across Linux, macOS, and Windows with no CGO dependency.
+`go.ofkm.dev/gaze` is Gaze, a public Go package for filesystem events on Linux, macOS, and Windows with no CGO dependency.
 
-It is designed around a very simple entrypoint:
+The easiest way to use it is through a single entrypoint:
 
 ```go
 w, err := gaze.WatchDirectory("my-directory")
 ```
 
-When you need explicit configuration, construct a real config value and pass it to the matching `...WithConfig` constructor:
+When you need more control, build a config value and pass it to the matching `...WithConfig` constructor:
 
 ```go
 cfg := gaze.Config{
@@ -27,14 +27,14 @@ cfg := gaze.Config{
 w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 ```
 
-The package is intentionally opinionated for easy production use.
+Gaze is opinionated so it stays easy to use in production.
 
 - pure Go implementation with per-platform native backends
-- directory watch by default, recursive automatically
-- filtering in watch enrollment and event dispatch
-- normalized event model with rename pairing and overflow detection
-- internal goroutine ownership so application code handles only callbacks
-- explicit overflow signaling instead of silent drops
+- directory watching is recursive by default
+- filtering applies both when watches are enrolled and when events are delivered
+- events are normalized, including rename pairing and overflow detection
+- the package owns its goroutines, so your code only handles callbacks
+- overflow is reported explicitly instead of being dropped silently
 
 ## Start here
 
@@ -44,9 +44,9 @@ The package is intentionally opinionated for easy production use.
 - [Platforms](/docs/platforms) for backend behavior and tradeoffs.
 - [Examples](/docs/examples) for practical patterns.
 
-## How this package behaves
+## What to expect
 
 - callbacks always run in package-owned goroutines
 - `Config.OnError` receives callback failures and runtime watcher errors
-- if no handlers are provided, events and errors are logged with `slog`
+- if you do not provide handlers, Gaze logs events and errors with `slog`
 - `Config.Logger` replaces the default logger used by that fallback path

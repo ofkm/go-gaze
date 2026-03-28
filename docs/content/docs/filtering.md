@@ -9,7 +9,7 @@ Filtering is applied in two places:
 1. during watch enrollment, so excluded directories are not walked or enrolled recursively
 2. during event dispatch, so excluded paths do not reach your handlers
 
-That keeps both kernel watch count and callback load down on large trees.
+That keeps kernel watch count and callback load down on large trees.
 
 ## Glob excludes
 
@@ -26,7 +26,7 @@ if err != nil {
 ```
 
 - glob patterns match base names and relevant path segments
-- narrow patterns are easier to reason about than broad wildcards
+- narrower patterns are easier to reason about than broad wildcards
 
 ## Prefix excludes
 
@@ -45,7 +45,7 @@ if err != nil {
 }
 ```
 
-Prefix excludes are ideal for large trees you never want to enroll at all.
+Prefix excludes are best for large trees you never want to enroll at all.
 
 ## Predicate excludes
 

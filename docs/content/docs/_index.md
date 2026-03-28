@@ -1,11 +1,11 @@
 ---
 title: "Documentation"
-description: "Install, configure, and ship Gaze without CGO."
+description: "Install, configure, and use Gaze without CGO."
 weight: 1
 toc: false
 ---
 
-The documentation is organized around practical use:
+The docs are organized around the way people actually use the package:
 
 - Start with Quickstart for the smallest working program.
 - Use API for the public package surface.

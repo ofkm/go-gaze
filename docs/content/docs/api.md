@@ -16,9 +16,9 @@ func NewWithConfig(cfg Config) (*Watcher, error)
 ```
 
 - `WatchDirectory` is the shortest path for recursive directory watching with default logging.
-- `WatchDirectoryWithConfig` uses the same behavior, but with explicit configuration.
+- `WatchDirectoryWithConfig` gives you the same behavior with explicit configuration.
 - `WatchFile` watches a single file through its parent directory.
-- `New` and `NewWithConfig` create an empty watcher for multi-root use via `Add`.
+- `New` and `NewWithConfig` create an empty watcher for multi-root use through `Add`.
 
 ## Watcher lifecycle
 
@@ -32,7 +32,7 @@ func (w *Watcher) Close() error
 - `Remove` removes the exact root you added earlier.
 - `Close` is idempotent and releases backend watches, queue state, and package-owned goroutines.
 
-`ErrWatcherClosed` is returned when operations are attempted after shutdown:
+`ErrWatcherClosed` is returned when you call methods after shutdown:
 
 ```go
 var ErrWatcherClosed = errors.New("gaze: watcher closed")
@@ -113,7 +113,7 @@ type PathInfo struct {
 - `RecursionDefault` keeps directory watches recursive and file watches non-recursive.
 - `RecursionDisabled` watches only the root directory level.
 - `RecursionEnabled` forces recursive directory enrollment.
-- `ExcludeGlobs`, `ExcludePrefixes`, and `Exclude` are all applied both during enrollment and event dispatch.
+- `ExcludeGlobs`, `ExcludePrefixes`, and `Exclude` are applied both when the watch is created and when events are delivered.
 - `OnEvent` receives normalized events that survive filtering.
 - `OnError` receives runtime watcher errors and recovered handler panics.
 - `Logger` replaces the fallback logger used when handlers are omitted.

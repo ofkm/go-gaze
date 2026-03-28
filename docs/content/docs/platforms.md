@@ -4,7 +4,7 @@ description: "Native backend behavior across Linux, macOS, and Windows."
 weight: 4
 ---
 
-The package ships a pure-Go platform layer for:
+Gaze ships a pure-Go platform layer for:
 
 - Linux: `inotify`
 - Windows: `ReadDirectoryChangesW`
@@ -16,7 +16,7 @@ The package ships a pure-Go platform layer for:
 - queue overflow is surfaced as `OpOverflow`
 - rename pairing uses rename cookies when available
 
-Operational notes:
+What this means in practice:
 
 - strong scaling characteristics for very large recursive trees
 - rename and overflow fidelity are preserved when the backend signal stream is healthy
@@ -25,22 +25,22 @@ Operational notes:
 
 - single root handle with subtree watching where requested
 - `FILE_ACTION_RENAMED_OLD_NAME`/`NEW_NAME` pairing is normalized to `OldPath` + `Path`
-- rename and move heavy write loads can produce rename/update bursts depending on file system behavior
+- heavy rename and move workloads can produce rename/update bursts, depending on file system behavior
 
-Operational notes:
+What this means in practice:
 
 - stable under frequent change load
-- recursion delegated to OS handles (when enabled in the watcher)
+  - recursion delegated to OS handles when enabled in the watcher
 
 ## macOS (`kqueue`)
 
 - pure-Go implementation to keep the package cgo-free
 - recursive behavior uses native mechanisms available on that platform
-- scale is adequate for typical project sizes and is slower to scale on very large trees than Linux/Windows
+- scale is fine for typical project sizes and slower on very large trees than Linux or Windows
 
-Operational notes:
+What this means in practice:
 
-- useful baseline on macOS when you need strict pure-Go delivery
+- useful baseline on macOS when you want strict pure-Go delivery
 - large tree workloads may increase kernel watch count and CPU usage faster
 
 ## Cross-platform behavior contract

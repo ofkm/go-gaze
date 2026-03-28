@@ -1,10 +1,11 @@
-// Package gaze powers Gaze, a pure-Go filesystem watcher with native backends.
+// Package gaze provides Gaze, a pure-Go filesystem watcher with native
+// backends for Linux, macOS, and Windows.
 //
-// It is designed around a simple entrypoint:
+// The simplest way to use it is through a single entrypoint:
 //
 //	w, err := gaze.WatchDirectory("my-directory")
 //
-// For explicit configuration, build a Config value directly and pass it to a
+// If you need more control, build a Config value and pass it to a
 // ...WithConfig constructor:
 //
 //	cfg := gaze.Config{
@@ -16,11 +17,11 @@
 //
 //	w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 //
-// Event dispatch stays inside the package. Callers provide handlers through a
-// Config value, or rely on the default slog-based logging path for both events
-// and internal watcher errors.
+// Callbacks run inside the package. You can provide handlers in Config, or let
+// Gaze fall back to slog-based logging for both events and internal watcher
+// errors.
 //
-// Linux and Windows are the strongest scalability targets. macOS remains pure-Go
-// and functional, but its backend enrolls more kernel watches and should be
-// expected to scale less efficiently on very large recursive trees.
+// Linux and Windows scale best. macOS stays pure-Go and works well, but its
+// backend uses more kernel watches and is less efficient on very large
+// recursive trees.
 package gaze
