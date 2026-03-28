@@ -38,6 +38,7 @@ type windowsWatcher struct {
 type windowsRoot struct {
 	target Target
 	handle windows.Handle
+	ready  chan struct{}
 }
 
 func New(cfg Config) (Watcher, error) {
@@ -78,10 +79,15 @@ func (w *windowsWatcher) Add(target Target) error {
 		return fmt.Errorf("gaze: open %q: %w", target.WatchPath, err)
 	}
 
-	root := &windowsRoot{target: target, handle: handle}
+	root := &windowsRoot{
+		target: target,
+		handle: handle,
+		ready:  make(chan struct{}),
+	}
 	w.roots[target.Path] = root
 	w.wg.Add(1)
 	go w.runRoot(root)
+	<-root.ready
 	return nil
 }
 
@@ -95,7 +101,7 @@ func (w *windowsWatcher) Remove(path string) error {
 	if !ok {
 		return os.ErrNotExist
 	}
-	return windows.CloseHandle(root.handle)
+	return closeWindowsHandle(root.handle)
 }
 
 func (w *windowsWatcher) Events() <-chan Event {
@@ -121,7 +127,7 @@ func (w *windowsWatcher) Close() error {
 	w.mu.Unlock()
 
 	for _, root := range roots {
-		_ = windows.CloseHandle(root.handle)
+		_ = closeWindowsHandle(root.handle)
 	}
 	w.wg.Wait()
 	close(w.events)
@@ -132,6 +138,7 @@ func (w *windowsWatcher) Close() error {
 
 func (w *windowsWatcher) runRoot(root *windowsRoot) {
 	defer w.wg.Done()
+	close(root.ready)
 
 	buf := make([]byte, 64*1024)
 	var pendingOld string
@@ -210,4 +217,13 @@ func (w *windowsWatcher) isClosed() bool {
 func probeDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
+}
+
+func closeWindowsHandle(handle windows.Handle) error {
+	if err := windows.CancelIoEx(handle, nil); err != nil &&
+		!errors.Is(err, windows.ERROR_NOT_FOUND) &&
+		!errors.Is(err, windows.ERROR_INVALID_HANDLE) {
+		_ = windows.CancelIo(handle)
+	}
+	return windows.CloseHandle(handle)
 }

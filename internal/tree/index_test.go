@@ -1,97 +1,118 @@
 package tree
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestIndexMatchesAndMovePrefix(t *testing.T) {
-	index := New()
-	_ = index.Add(Root{Path: "/root", WatchPath: "/root", IsDir: true, Recursive: true})
-	_ = index.Add(Root{Path: "/flat", WatchPath: "/flat", IsDir: true, Recursive: false})
-	_ = index.Add(Root{Path: "/flat/file.txt", WatchPath: "/flat", IsDir: false})
+	root := filepath.Join(string(filepath.Separator), "root")
+	flat := filepath.Join(string(filepath.Separator), "flat")
+	file := filepath.Join(flat, "file.txt")
+	moved := filepath.Join(string(filepath.Separator), "moved")
 
-	if !index.Matches("/root/a/b.txt") {
+	index := New()
+	_ = index.Add(Root{Path: root, WatchPath: root, IsDir: true, Recursive: true})
+	_ = index.Add(Root{Path: flat, WatchPath: flat, IsDir: true, Recursive: false})
+	_ = index.Add(Root{Path: file, WatchPath: flat, IsDir: false})
+
+	if !index.Matches(filepath.Join(root, "a", "b.txt")) {
 		t.Fatal("recursive root did not match descendant")
 	}
-	if !index.Matches("/flat/child.txt") {
+	if !index.Matches(filepath.Join(flat, "child.txt")) {
 		t.Fatal("flat root did not match direct child")
 	}
-	if index.Matches("/flat/nested/child.txt") {
+	if index.Matches(filepath.Join(flat, "nested", "child.txt")) {
 		t.Fatal("flat root unexpectedly matched nested child")
 	}
-	if !index.Matches("/flat/file.txt") {
+	if !index.Matches(file) {
 		t.Fatal("file root did not match exact file")
 	}
 
-	index.MovePrefix("/root", "/moved")
-	if !index.Matches("/moved/a/b.txt") {
+	index.MovePrefix(root, moved)
+	if !index.Matches(filepath.Join(moved, "a", "b.txt")) {
 		t.Fatal("moved recursive root did not match descendant")
 	}
-	if index.Matches("/root/a/b.txt") {
+	if index.Matches(filepath.Join(root, "a", "b.txt")) {
 		t.Fatal("old recursive root path still matched after move")
 	}
 
-	if removed, ok := index.Remove("/flat/file.txt"); !ok || removed.Path != "/flat/file.txt" {
+	if removed, ok := index.Remove(file); !ok || removed.Path != file {
 		t.Fatalf("Remove(file root) = (%+v, %v), want removed file root", removed, ok)
 	}
-	if _, ok := index.Remove("/missing"); ok {
+	if _, ok := index.Remove(filepath.Join(string(filepath.Separator), "missing")); ok {
 		t.Fatal("Remove(missing) = ok, want false")
 	}
 }
 
 func TestJoinMovedPath(t *testing.T) {
-	if got := joinMovedPath("/old/child/file.txt", "/old", "/new"); got != "/new/child/file.txt" {
-		t.Fatalf("joinMovedPath() = %q, want %q", got, "/new/child/file.txt")
+	oldRoot := filepath.Join(string(filepath.Separator), "old")
+	newRoot := filepath.Join(string(filepath.Separator), "new")
+	want := filepath.Join(newRoot, "child", "file.txt")
+	if got := joinMovedPath(filepath.Join(oldRoot, "child", "file.txt"), oldRoot, newRoot); got != want {
+		t.Fatalf("joinMovedPath() = %q, want %q", got, want)
 	}
 }
 
 func TestIndexMovePrefixRewritesNestedAndExactMatches(t *testing.T) {
+	project := filepath.Join(string(filepath.Separator), "tmp", "project")
+	projectNested := filepath.Join(project, "nested")
+	projectFile := filepath.Join(string(filepath.Separator), "tmp", "project-file")
+	renamed := filepath.Join(string(filepath.Separator), "tmp", "renamed")
+
 	idx := New()
-	if err := idx.Add(Root{Path: "/tmp/project", WatchPath: "/tmp/project", IsDir: true, Recursive: true}); err != nil {
+	if err := idx.Add(Root{Path: project, WatchPath: project, IsDir: true, Recursive: true}); err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
-	if err := idx.Add(Root{Path: "/tmp/project/nested", WatchPath: "/tmp/project/nested", IsDir: true, Recursive: true}); err != nil {
+	if err := idx.Add(Root{Path: projectNested, WatchPath: projectNested, IsDir: true, Recursive: true}); err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
-	if err := idx.Add(Root{Path: "/tmp/project-file"}); err != nil {
+	if err := idx.Add(Root{Path: projectFile}); err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
 
-	idx.MovePrefix("/tmp/project", "/tmp/renamed")
+	idx.MovePrefix(project, renamed)
 
-	if !idx.Matches("/tmp/renamed") {
+	if !idx.Matches(renamed) {
 		t.Fatal("expected exact moved root to match")
 	}
-	if !idx.Matches("/tmp/renamed/nested/child.txt") {
+	if !idx.Matches(filepath.Join(renamed, "nested", "child.txt")) {
 		t.Fatal("expected nested moved directory to match descendants")
 	}
-	if idx.Matches("/tmp/project/nested/child.txt") {
+	if idx.Matches(filepath.Join(project, "nested", "child.txt")) {
 		t.Fatal("did not expect old nested directory to keep matching")
 	}
-	if idx.Matches("/tmp/renamed-file") {
+	if idx.Matches(filepath.Join(string(filepath.Separator), "tmp", "renamed-file")) {
 		t.Fatal("did not expect sibling path to be rewritten")
 	}
-	if !idx.Matches("/tmp/project-file") {
+	if !idx.Matches(projectFile) {
 		t.Fatal("expected unrelated sibling root to remain")
 	}
 }
 
 func TestIndexMovePrefixIgnoresUnrelatedPrefix(t *testing.T) {
+	root := filepath.Join(string(filepath.Separator), "workspace", "root")
+
 	idx := New()
-	if err := idx.Add(Root{Path: "/workspace/root", Recursive: true}); err != nil {
+	if err := idx.Add(Root{Path: root, Recursive: true}); err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
 
-	idx.MovePrefix("/workspace/other", "/workspace/new")
+	idx.MovePrefix(filepath.Join(string(filepath.Separator), "workspace", "other"), filepath.Join(string(filepath.Separator), "workspace", "new"))
 
-	if !idx.Matches("/workspace/root") {
+	if !idx.Matches(root) {
 		t.Fatal("expected unrelated move to leave existing root intact")
 	}
 }
 
 func TestJoinMovedPathExactAndNested(t *testing.T) {
-	if got := joinMovedPath("/tmp/old", "/tmp/old", "/tmp/new"); got != "/tmp/new" {
-		t.Fatalf("joinMovedPath() = %q, want %q", got, "/tmp/new")
+	oldRoot := filepath.Join(string(filepath.Separator), "tmp", "old")
+	newRoot := filepath.Join(string(filepath.Separator), "tmp", "new")
+	if got := joinMovedPath(oldRoot, oldRoot, newRoot); got != newRoot {
+		t.Fatalf("joinMovedPath() = %q, want %q", got, newRoot)
 	}
-	if got := joinMovedPath("/tmp/old/nested/file.txt", "/tmp/old", "/tmp/new"); got != "/tmp/new/nested/file.txt" {
-		t.Fatalf("joinMovedPath() = %q, want %q", got, "/tmp/new/nested/file.txt")
+	want := filepath.Join(newRoot, "nested", "file.txt")
+	if got := joinMovedPath(filepath.Join(oldRoot, "nested", "file.txt"), oldRoot, newRoot); got != want {
+		t.Fatalf("joinMovedPath() = %q, want %q", got, want)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -211,6 +212,9 @@ func TestPrepareTargetExcludeAndSymlinkHandling(t *testing.T) {
 
 	link := filepath.Join(root, "linked")
 	if err := os.Symlink(realDir, link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("symlink setup unavailable on windows: %v", err)
+		}
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
@@ -297,6 +301,9 @@ func TestWatcherAddRemoveAndClose(t *testing.T) {
 }
 
 func TestWatcherRunBackendAndDispatch(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "file.txt")
+
 	driver := newStubDriver()
 	events := make(chan Event, 4)
 	errs := make(chan error, 4)
@@ -308,19 +315,19 @@ func TestWatcherRunBackendAndDispatch(t *testing.T) {
 			errs <- err
 		},
 	}, driver)
-	if err := w.index.Add(tree.Root{Path: "/tmp", WatchPath: "/tmp", IsDir: true, Recursive: true}); err != nil {
-		t.Fatalf("index.Add(/tmp) error = %v", err)
+	if err := w.index.Add(tree.Root{Path: root, WatchPath: root, IsDir: true, Recursive: true}); err != nil {
+		t.Fatalf("index.Add(%q) error = %v", root, err)
 	}
 
 	go w.runBackend()
 	go w.runEvents()
 
-	driver.events <- backend.Event{Path: "/tmp/file.txt", Op: backend.OpCreate}
+	driver.events <- backend.Event{Path: path, Op: backend.OpCreate}
 
 	select {
 	case evt := <-events:
-		if evt.Path != "/tmp/file.txt" || !evt.Op.Has(OpCreate) {
-			t.Fatalf("event = %+v, want create on /tmp/file.txt", evt)
+		if evt.Path != path || !evt.Op.Has(OpCreate) {
+			t.Fatalf("event = %+v, want create on %q", evt, path)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for dispatched event")
@@ -452,11 +459,11 @@ func TestDispatchEventAndErrorLogging(t *testing.T) {
 
 	w.dispatchEvent(Event{
 		Path:    "/tmp/file.txt",
-		OldPath: "/tmp/old.txt",
+		OldPath: filepath.Join(string(filepath.Separator), "tmp", "old.txt"),
 		Op:      OpRename,
 		IsDir:   false,
 	})
-	if got := buf.String(); !strings.Contains(got, "gaze event") || !strings.Contains(got, "old_path=/tmp/old.txt") {
+	if got := buf.String(); !strings.Contains(got, "gaze event") || !strings.Contains(got, "old_path="+filepath.Join(string(filepath.Separator), "tmp", "old.txt")) {
 		t.Fatalf("dispatchEvent log = %q, want event log with old_path", got)
 	}
 
@@ -555,6 +562,9 @@ func TestWatchDirectoryWithConfigFollowsDirectorySymlink(t *testing.T) {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 	if err := os.Symlink(target, link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("symlink setup unavailable on windows: %v", err)
+		}
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
@@ -571,6 +581,9 @@ func TestWatchFileWithConfigBrokenSymlinkFails(t *testing.T) {
 	root := t.TempDir()
 	link := filepath.Join(root, "broken.txt")
 	if err := os.Symlink(filepath.Join(root, "missing.txt"), link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("symlink setup unavailable on windows: %v", err)
+		}
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
@@ -675,6 +688,9 @@ func TestPrepareTargetRejectsSymlinkWithoutFollow(t *testing.T) {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
 	if err := os.Symlink(target, link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("symlink setup unavailable on windows: %v", err)
+		}
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
@@ -729,6 +745,8 @@ func TestNormalizePathCleansRelativePath(t *testing.T) {
 }
 
 func TestHandleBackendEventBranches(t *testing.T) {
+	tmpRoot := filepath.Join(string(filepath.Separator), "tmp")
+
 	matcher, err := filter.New(filter.Config{
 		Exclude: func(path string, isDir bool) bool { return strings.Contains(path, "excluded") },
 	})
@@ -743,7 +761,7 @@ func TestHandleBackendEventBranches(t *testing.T) {
 			index:   tree.New(),
 			queue:   queue.New[Event](1),
 		}
-		w.handleBackendEvent(backend.Event{Path: "/tmp/other", Op: backend.OpWrite})
+		w.handleBackendEvent(backend.Event{Path: filepath.Join(tmpRoot, "other"), Op: backend.OpWrite})
 		w.queue.Close()
 		if _, ok := w.queue.Pop(); ok {
 			t.Fatal("did not expect unmatched event to be queued")
@@ -772,10 +790,11 @@ func TestHandleBackendEventBranches(t *testing.T) {
 			index:   tree.New(),
 			queue:   queue.New[Event](1),
 		}
-		if err := w.index.Add(tree.Root{Path: "/tmp/excluded.txt"}); err != nil {
+		excludedPath := filepath.Join(tmpRoot, "excluded.txt")
+		if err := w.index.Add(tree.Root{Path: excludedPath}); err != nil {
 			t.Fatalf("index.Add() error = %v", err)
 		}
-		w.handleBackendEvent(backend.Event{OldPath: "/tmp/excluded.txt", Op: backend.OpRemove})
+		w.handleBackendEvent(backend.Event{OldPath: excludedPath, Op: backend.OpRemove})
 		w.queue.Close()
 		if _, ok := w.queue.Pop(); ok {
 			t.Fatal("did not expect excluded old-path event to be queued")
@@ -790,7 +809,8 @@ func TestNewWatcherExcludeCallbackUsesPathInfo(t *testing.T) {
 	driver := newStubDriver()
 	var captured PathInfo
 	newBackend = func(cfg backend.Config) (backend.Watcher, error) {
-		if !cfg.ShouldExclude("/tmp/example.txt", false) {
+		candidate := filepath.Join(string(filepath.Separator), "tmp", "example.txt")
+		if !cfg.ShouldExclude(candidate, false) {
 			t.Fatal("expected wrapped exclude callback to return true")
 		}
 		return driver, nil
@@ -805,7 +825,7 @@ func TestNewWatcherExcludeCallbackUsesPathInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWithConfig() error = %v", err)
 	}
-	if captured.Path != "/tmp/example.txt" || captured.Base != "example.txt" || captured.IsDir {
+	if captured.Path != filepath.Join(string(filepath.Separator), "tmp", "example.txt") || captured.Base != "example.txt" || captured.IsDir {
 		t.Fatalf("captured PathInfo = %+v", captured)
 	}
 	if err := w.Close(); err != nil {

@@ -1,13 +1,19 @@
 package filter
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestMatcherShouldExclude(t *testing.T) {
+	cacheDir := filepath.Join(string(filepath.Separator), "tmp", "cache")
+	skipDir := filepath.Join(string(filepath.Separator), "tmp", "skipdir")
+
 	matcher, err := New(Config{
-		Prefixes: []string{"/tmp/cache", "vendor"},
+		Prefixes: []string{cacheDir, "vendor"},
 		Globs:    []string{"*.tmp"},
 		Exclude: func(path string, isDir bool) bool {
-			return isDir && path == "/tmp/skipdir"
+			return isDir && path == skipDir
 		},
 	})
 	if err != nil {
@@ -19,11 +25,11 @@ func TestMatcherShouldExclude(t *testing.T) {
 		isDir   bool
 		exclude bool
 	}{
-		{path: "/tmp/cache/a.txt", exclude: true},
-		{path: "/tmp/project/build.tmp", exclude: true},
-		{path: "vendor/pkg/file.go", exclude: true},
-		{path: "/tmp/skipdir", isDir: true, exclude: true},
-		{path: "/tmp/project/main.go", exclude: false},
+		{path: filepath.Join(cacheDir, "a.txt"), exclude: true},
+		{path: filepath.Join(string(filepath.Separator), "tmp", "project", "build.tmp"), exclude: true},
+		{path: filepath.Join("vendor", "pkg", "file.go"), exclude: true},
+		{path: skipDir, isDir: true, exclude: true},
+		{path: filepath.Join(string(filepath.Separator), "tmp", "project", "main.go"), exclude: false},
 	}
 
 	for _, tc := range cases {
@@ -38,14 +44,15 @@ func TestMatcherNewTrimsAndRejectsInvalidGlob(t *testing.T) {
 		t.Fatal("New(invalid glob) error = nil, want error")
 	}
 
+	cacheDir := filepath.Join(string(filepath.Separator), "tmp", "cache")
 	matcher, err := New(Config{
-		Prefixes: []string{"", " /tmp/cache/../cache "},
+		Prefixes: []string{"", " " + filepath.Join(cacheDir, "..", "cache") + " "},
 		Globs:    []string{"", "*.log"},
 	})
 	if err != nil {
 		t.Fatalf("New(trimmed config) error = %v", err)
 	}
-	if !matcher.ShouldExclude("/tmp/cache/app.log", false) {
+	if !matcher.ShouldExclude(filepath.Join(cacheDir, "app.log"), false) {
 		t.Fatal("ShouldExclude() = false, want true for cleaned prefix/glob")
 	}
 }
@@ -66,11 +73,11 @@ func TestMatcherShouldExcludeDirectoryPrefixAndGlobVariants(t *testing.T) {
 		want  bool
 	}{
 		{name: "prefix dir", path: "vendor", isDir: true, want: true},
-		{name: "prefix child", path: "vendor/pkg/file.go", want: true},
-		{name: "hidden dir prefix child", path: ".git/objects/01", want: true},
-		{name: "glob file", path: "build/output.tmp", want: true},
+		{name: "prefix child", path: filepath.Join("vendor", "pkg", "file.go"), want: true},
+		{name: "hidden dir prefix child", path: filepath.Join(".git", "objects", "01"), want: true},
+		{name: "glob file", path: filepath.Join("build", "output.tmp"), want: true},
 		{name: "glob simple", path: "data.cache", want: true},
-		{name: "keep source", path: "internal/filter/matcher.go", want: false},
+		{name: "keep source", path: filepath.Join("internal", "filter", "matcher.go"), want: false},
 	}
 
 	for _, tc := range tests {
@@ -95,7 +102,7 @@ func TestMatcherShouldExcludeExcludeCallback(t *testing.T) {
 	if !m.ShouldExclude("generated", true) {
 		t.Fatal("expected callback exclusion for generated directory")
 	}
-	if m.ShouldExclude("generated/file.go", false) {
+	if m.ShouldExclude(filepath.Join("generated", "file.go"), false) {
 		t.Fatal("did not expect callback exclusion for file path")
 	}
 }
@@ -116,7 +123,7 @@ func TestMatcherNewTrimsBlankEntriesAndRejectsInvalidGlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	if !m.ShouldExclude("nested/file.log", false) {
+	if !m.ShouldExclude(filepath.Join("nested", "file.log"), false) {
 		t.Fatal("expected slash-form glob to match full path")
 	}
 }
@@ -126,7 +133,7 @@ func TestMatcherShouldExcludeSlashedGlob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	if !m.ShouldExclude("nested/file.log", false) {
+	if !m.ShouldExclude(filepath.Join("nested", "file.log"), false) {
 		t.Fatal("expected slashed glob to match cleaned path")
 	}
 }

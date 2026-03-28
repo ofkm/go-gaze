@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 )
@@ -66,13 +67,17 @@ func TestWalkPath(t *testing.T) {
 func TestHasPathPrefix(t *testing.T) {
 	t.Parallel()
 
-	if !hasPathPrefix("/tmp/project/file.txt", "/tmp/project") {
+	root := filepath.Join(string(filepath.Separator), "tmp", "project")
+	descendant := filepath.Join(root, "file.txt")
+	other := filepath.Join(string(filepath.Separator), "tmp", "project-other")
+
+	if !hasPathPrefix(descendant, root) {
 		t.Fatal("hasPathPrefix(descendant) = false, want true")
 	}
-	if !hasPathPrefix("/tmp/project", "/tmp/project") {
+	if !hasPathPrefix(root, root) {
 		t.Fatal("hasPathPrefix(equal) = false, want true")
 	}
-	if hasPathPrefix("/tmp/project-other", "/tmp/project") {
+	if hasPathPrefix(other, root) {
 		t.Fatal("hasPathPrefix(non-descendant) = true, want false")
 	}
 }
@@ -132,6 +137,10 @@ func TestWalkPathRecursiveHonorsExclude(t *testing.T) {
 }
 
 func TestWalkPathRecursivePropagatesWalkError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-based walk failures are not reliable on windows")
+	}
+
 	root := t.TempDir()
 	restricted := filepath.Join(root, "restricted")
 	mustMkdirHelperTest(t, restricted)
