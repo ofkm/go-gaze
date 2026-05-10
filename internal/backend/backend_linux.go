@@ -117,7 +117,7 @@ func (w *linuxWatcher) Remove(path string) error {
 		}
 		delete(node.roots, path)
 		if len(node.roots) == 0 {
-			_, _ = unix.InotifyRmWatch(w.fd, uint32(node.wd))
+			_, _ = unix.InotifyRmWatch(w.fd, linuxWatchDescriptor(node.wd))
 			delete(w.watched, dir)
 			delete(w.wdToPath, node.wd)
 		}
@@ -189,7 +189,7 @@ func (w *linuxWatcher) run() {
 	for {
 		w.flushPending(time.Now().Add(-250 * time.Millisecond))
 
-		poll := []unix.PollFd{{Fd: int32(w.fd), Events: unix.POLLIN}}
+		poll := []unix.PollFd{{Fd: linuxPollFD(w.fd), Events: unix.POLLIN}}
 		n, err := unix.Poll(poll, 250)
 		if err != nil {
 			if errors.Is(err, unix.EINTR) {
@@ -339,7 +339,7 @@ func (w *linuxWatcher) removeWatchedPrefix(prefix string) {
 		if !utils.HasPathPrefix(path, prefix) {
 			continue
 		}
-		_, _ = unix.InotifyRmWatch(w.fd, uint32(node.wd))
+		_, _ = unix.InotifyRmWatch(w.fd, linuxWatchDescriptor(node.wd))
 		delete(w.wdToPath, node.wd)
 		delete(w.watched, path)
 		for root := range node.roots {
@@ -420,7 +420,7 @@ func (w *linuxWatcher) removeWatchedPrefixLocked(prefix string) {
 		if !utils.HasPathPrefix(path, prefix) {
 			continue
 		}
-		_, _ = unix.InotifyRmWatch(w.fd, uint32(node.wd))
+		_, _ = unix.InotifyRmWatch(w.fd, linuxWatchDescriptor(node.wd))
 		delete(w.wdToPath, node.wd)
 		delete(w.watched, path)
 		for root := range node.roots {
@@ -444,6 +444,16 @@ func (w *linuxWatcher) isClosed() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.closed
+}
+
+func linuxWatchDescriptor(wd int) uint32 {
+	// #nosec G115 -- inotify watch descriptors are non-negative ints returned by the kernel API that accepts uint32 for removal.
+	return uint32(wd)
+}
+
+func linuxPollFD(fd int) int32 {
+	// #nosec G115 -- inotify file descriptors are process-local fds and fit poll's int32 fd field on supported Linux targets.
+	return int32(fd)
 }
 
 func trimNull(buf []byte) string {
