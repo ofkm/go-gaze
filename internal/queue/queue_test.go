@@ -45,11 +45,13 @@ func TestQueueBlocksUntilConsumer(t *testing.T) {
 func TestQueueCloseUnblocksWaiters(t *testing.T) {
 	q := New[int](1)
 	var wg sync.WaitGroup
+	waiting := make(chan struct{})
 	wg.Go(func() {
+		close(waiting)
 		_, _ = q.Pop()
 	})
 
-	time.Sleep(50 * time.Millisecond)
+	<-waiting
 	q.Close()
 
 	done := make(chan struct{})

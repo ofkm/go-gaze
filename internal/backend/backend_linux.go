@@ -11,6 +11,7 @@ import (
 	"time"
 	"unsafe"
 
+	"go.ofkm.dev/gaze/pkg/utils"
 	"golang.org/x/sys/unix"
 )
 
@@ -314,7 +315,7 @@ func (w *linuxWatcher) addRecursiveDirIfNeeded(path string) {
 		if !target.IsDir || !target.Recursive {
 			continue
 		}
-		if hasPathPrefix(path, target.Path) {
+		if utils.HasPathPrefix(path, target.Path) {
 			roots = append(roots, rootPath)
 		}
 	}
@@ -335,7 +336,7 @@ func (w *linuxWatcher) removeWatchedPrefix(prefix string) {
 	defer w.mu.Unlock()
 
 	for path, node := range w.watched {
-		if !hasPathPrefix(path, prefix) {
+		if !utils.HasPathPrefix(path, prefix) {
 			continue
 		}
 		_, _ = unix.InotifyRmWatch(w.fd, uint32(node.wd))
@@ -353,8 +354,8 @@ func (w *linuxWatcher) renameWatchedPrefix(oldPrefix, newPrefix string) {
 
 	updated := make(map[string]*linuxNode, len(w.watched))
 	for path, node := range w.watched {
-		if hasPathPrefix(path, oldPrefix) {
-			newPath := filepath.Clean(newPrefix + path[len(oldPrefix):])
+		if utils.HasPathPrefix(path, oldPrefix) {
+			newPath := utils.JoinMovedPath(path, oldPrefix, newPrefix)
 			node.path = newPath
 			updated[newPath] = node
 			w.wdToPath[node.wd] = newPath
@@ -396,7 +397,7 @@ func (w *linuxWatcher) takeRename(cookie uint32) (pendingRename, bool) {
 
 func (w *linuxWatcher) flushPending(cutoff time.Time) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	var events []Event
 	for cookie, pending := range w.pending {
 		if pending.at.After(cutoff) {
 			continue
@@ -405,13 +406,18 @@ func (w *linuxWatcher) flushPending(cutoff time.Time) {
 		if pending.isDir {
 			w.removeWatchedPrefixLocked(pending.path)
 		}
-		w.emitEventLocked(Event{Path: pending.path, Op: OpRemove, IsDir: pending.isDir})
+		events = append(events, Event{Path: pending.path, Op: OpRemove, IsDir: pending.isDir})
+	}
+	w.mu.Unlock()
+
+	for _, evt := range events {
+		w.emitEvent(evt)
 	}
 }
 
 func (w *linuxWatcher) removeWatchedPrefixLocked(prefix string) {
 	for path, node := range w.watched {
-		if !hasPathPrefix(path, prefix) {
+		if !utils.HasPathPrefix(path, prefix) {
 			continue
 		}
 		_, _ = unix.InotifyRmWatch(w.fd, uint32(node.wd))
@@ -424,10 +430,6 @@ func (w *linuxWatcher) removeWatchedPrefixLocked(prefix string) {
 }
 
 func (w *linuxWatcher) emitEvent(evt Event) {
-	w.events <- evt
-}
-
-func (w *linuxWatcher) emitEventLocked(evt Event) {
 	w.events <- evt
 }
 

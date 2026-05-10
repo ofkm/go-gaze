@@ -86,6 +86,7 @@ func main() {
 	buf.WriteString("- Absolute numbers will move with hardware, runner class, Go version, and filesystem behavior. The useful signal is whether a change moves runtime, allocations, or both.\n")
 	buf.WriteString("- If you want fresh committed numbers, run the `Benchmarks` workflow in GitHub Actions.\n")
 
+	// #nosec G306,G703 -- this writes a checked-in documentation page chosen by repo maintainers.
 	if err := os.WriteFile(outPath, buf.Bytes(), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", outPath, err)
 		os.Exit(1)
@@ -93,6 +94,7 @@ func main() {
 }
 
 func parseBenchmarkFile(path string) (benchmarkDoc, error) {
+	// #nosec G304,G703 -- benchmark artifact paths are provided by this repo's CI workflow or local maintainer input.
 	file, err := os.Open(path)
 	if err != nil {
 		return benchmarkDoc{}, err

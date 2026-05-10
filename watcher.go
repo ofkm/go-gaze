@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"go.ofkm.dev/gaze/internal/backend"
 	"go.ofkm.dev/gaze/internal/filter"
 	"go.ofkm.dev/gaze/internal/queue"
 	"go.ofkm.dev/gaze/internal/tree"
+	"go.ofkm.dev/gaze/types"
 )
 
 var (
@@ -21,23 +23,24 @@ var (
 )
 
 type Watcher struct {
-	cfg     Config
+	cfg     types.Config
 	matcher *filter.Matcher
 	index   *tree.Index
 	driver  backend.Watcher
-	queue   *queue.Queue[Event]
+	queue   *queue.Queue[types.Event]
 	logger  *slog.Logger
 
 	closeOnce sync.Once
 	closeErr  error
+	closed    atomic.Bool
 	done      chan struct{}
 }
 
 func WatchDirectory(path string) (*Watcher, error) {
-	return WatchDirectoryWithConfig(path, Config{})
+	return WatchDirectoryWithConfig(path, types.Config{})
 }
 
-func WatchDirectoryWithConfig(path string, cfg Config) (*Watcher, error) {
+func WatchDirectoryWithConfig(path string, cfg types.Config) (*Watcher, error) {
 	w, err := NewWithConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -52,12 +55,12 @@ func WatchDirectoryWithConfig(path string, cfg Config) (*Watcher, error) {
 }
 
 func WatchFile(path string) (*Watcher, error) {
-	return WatchFileWithConfig(path, Config{})
+	return WatchFileWithConfig(path, types.Config{})
 }
 
-func WatchFileWithConfig(path string, cfg Config) (*Watcher, error) {
+func WatchFileWithConfig(path string, cfg types.Config) (*Watcher, error) {
 	cfg = resolveConfig(cfg)
-	cfg.Recursion = RecursionDisabled
+	cfg.Recursion = types.RecursionDisabled
 
 	w, err := newWatcher(cfg)
 	if err != nil {
@@ -73,18 +76,18 @@ func WatchFileWithConfig(path string, cfg Config) (*Watcher, error) {
 }
 
 func New() (*Watcher, error) {
-	return NewWithConfig(Config{})
+	return NewWithConfig(types.Config{})
 }
 
-func NewWithConfig(cfg Config) (*Watcher, error) {
+func NewWithConfig(cfg types.Config) (*Watcher, error) {
 	return newWatcher(resolveConfig(cfg))
 }
 
-func newWatcher(cfg Config) (*Watcher, error) {
+func newWatcher(cfg types.Config) (*Watcher, error) {
 	var exclude func(string, bool) bool
 	if cfg.Exclude != nil {
 		exclude = func(path string, isDir bool) bool {
-			return cfg.Exclude(PathInfo{
+			return cfg.Exclude(types.PathInfo{
 				Path:  path,
 				Base:  filepath.Base(path),
 				IsDir: isDir,
@@ -118,7 +121,7 @@ func newWatcher(cfg Config) (*Watcher, error) {
 		matcher: matcher,
 		index:   tree.New(),
 		driver:  driver,
-		queue:   queue.New[Event](cfg.QueueCapacity),
+		queue:   queue.New[types.Event](cfg.QueueCapacity),
 		logger:  cfg.Logger,
 		done:    make(chan struct{}),
 	}
@@ -130,6 +133,10 @@ func newWatcher(cfg Config) (*Watcher, error) {
 }
 
 func (w *Watcher) Add(path string) error {
+	if w.closed.Load() {
+		return ErrWatcherClosed
+	}
+
 	target, err := w.prepareTarget(path)
 	if err != nil {
 		return err
@@ -151,6 +158,9 @@ func (w *Watcher) Add(path string) error {
 		Recursive: target.Recursive,
 	}); err != nil {
 		_, _ = w.index.Remove(target.Path)
+		if errors.Is(err, os.ErrClosed) {
+			return ErrWatcherClosed
+		}
 		return err
 	}
 
@@ -158,6 +168,10 @@ func (w *Watcher) Add(path string) error {
 }
 
 func (w *Watcher) Remove(path string) error {
+	if w.closed.Load() {
+		return ErrWatcherClosed
+	}
+
 	normalized, err := w.normalizePath(path)
 	if err != nil {
 		return err
@@ -168,11 +182,18 @@ func (w *Watcher) Remove(path string) error {
 		return os.ErrNotExist
 	}
 
-	return w.driver.Remove(root.Path)
+	if err := w.driver.Remove(root.Path); err != nil {
+		if errors.Is(err, os.ErrClosed) {
+			return ErrWatcherClosed
+		}
+		return err
+	}
+	return nil
 }
 
 func (w *Watcher) Close() error {
 	w.closeOnce.Do(func() {
+		w.closed.Store(true)
 		w.closeErr = w.driver.Close()
 		w.queue.Close()
 		<-w.done
@@ -213,7 +234,7 @@ func (w *Watcher) runEvents() {
 }
 
 func (w *Watcher) handleBackendEvent(evt backend.Event) {
-	publicOp := Op(evt.Op)
+	publicOp := types.Op(evt.Op)
 
 	if evt.Op.Has(backend.OpRename) && evt.Path != "" && evt.OldPath != "" {
 		w.index.MovePrefix(evt.OldPath, evt.Path)
@@ -225,11 +246,11 @@ func (w *Watcher) handleBackendEvent(evt backend.Event) {
 		}
 	}
 
-	if publicOp != OpOverflow && !w.cfg.Ops.Has(publicOp) {
+	if publicOp != types.OpOverflow && !w.cfg.Ops.Has(publicOp) {
 		return
 	}
 
-	public := Event{
+	public := types.Event{
 		Path:    evt.Path,
 		OldPath: evt.OldPath,
 		Op:      publicOp,
@@ -259,7 +280,7 @@ func (w *Watcher) emitError(err error) {
 	}
 }
 
-func (w *Watcher) dispatchEvent(evt Event) {
+func (w *Watcher) dispatchEvent(evt types.Event) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			w.emitError(fmt.Errorf("gaze: event handler panic: %v", recovered))
@@ -330,7 +351,7 @@ func (w *Watcher) prepareTarget(path string) (preparedTarget, error) {
 		Path:      normalized,
 		WatchPath: normalized,
 		IsDir:     isDir,
-		Recursive: isDir && w.cfg.recursiveEnabled(true),
+		Recursive: isDir && recursiveEnabled(w.cfg, true),
 	}
 	if !isDir {
 		target.WatchPath = filepath.Dir(normalized)

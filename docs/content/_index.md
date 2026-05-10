@@ -17,9 +17,9 @@ w, err := gaze.WatchDirectory("my-directory")
 If you need filters or callbacks, pass a config:
 
 ```go
-cfg := gaze.Config{
+cfg := types.Config{
 	ExcludeGlobs: []string{"*.tmp", ".DS_Store"},
-	OnEvent: func(evt gaze.Event) {
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 }

@@ -1,23 +1,23 @@
-// Gaze a pure-Go filesystem watcher for Linux, macOS,
+// Gaze is a pure-Go filesystem watcher for Linux, macOS,
 // and Windows.
 //
 // For the common case, start with a directory watch:
 //
 //	w, err := gaze.WatchDirectory("my-directory")
 //
-// If you need filters, callbacks, or logger control, use a Config value with a
-// ...WithConfig constructor:
+// If you need filters, callbacks, or logger control, use a types.Config value
+// with a ...WithConfig constructor:
 //
-//	cfg := gaze.Config{
+//	cfg := types.Config{
 //		ExcludeGlobs: []string{"*.tmp"},
-//		OnEvent: func(evt gaze.Event) {
+//		OnEvent: func(evt types.Event) {
 //			fmt.Println(evt)
 //		},
 //	}
 //
 //	w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
 //
-// Gaze owns the watcher goroutines internally. You can handle events an
+// Gaze owns the watcher goroutines internally. You can handle events and
 // errors with callbacks, or let the package log them through slog.
 //
 // Linux and Windows generally handle large recursive trees best. macOS is

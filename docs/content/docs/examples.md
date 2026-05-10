@@ -27,6 +27,7 @@ import (
 	"syscall"
 
 	"go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze/types"
 )
 
 func main() {
@@ -42,12 +43,12 @@ func run(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	w, err := gaze.NewWithConfig(gaze.Config{
-		Exclude: func(info gaze.PathInfo) bool {
+	w, err := gaze.NewWithConfig(types.Config{
+		Exclude: func(info types.PathInfo) bool {
 			return info.IsDir && info.Base == ".git"
 		},
-		Ops: gaze.OpCreate | gaze.OpWrite | gaze.OpRemove | gaze.OpRename,
-		OnEvent: func(evt gaze.Event) {
+		Ops: types.OpCreate | types.OpWrite | types.OpRemove | types.OpRename,
+		OnEvent: func(evt types.Event) {
 			fmt.Println(evt)
 		},
 		OnError: func(err error) {
@@ -80,8 +81,8 @@ func run(args []string) int {
 ## Watch one file
 
 ```go
-cfg := gaze.Config{
-	OnEvent: func(evt gaze.Event) {
+cfg := types.Config{
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 }
@@ -100,8 +101,8 @@ defer func() {
 ## Multi-root watcher
 
 ```go
-cfg := gaze.Config{
-	OnEvent: func(evt gaze.Event) {
+cfg := types.Config{
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 	OnError: func(err error) {
@@ -133,9 +134,9 @@ if err := w.Remove("/srv/app/config"); err != nil {
 ## Filter by operation
 
 ```go
-cfg := gaze.Config{
-	Ops: gaze.OpCreate | gaze.OpRemove | gaze.OpRename,
-	OnEvent: func(evt gaze.Event) {
+cfg := types.Config{
+	Ops: types.OpCreate | types.OpRemove | types.OpRename,
+	OnEvent: func(evt types.Event) {
 		fmt.Println("interesting:", evt)
 	},
 }
@@ -150,7 +151,7 @@ if err != nil {
 
 ```go
 logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-cfg := gaze.Config{
+cfg := types.Config{
 	Logger: logger,
 }
 
@@ -165,9 +166,9 @@ If you leave out handlers, Gaze writes events and internal errors to the configu
 ## Follow symlinks
 
 ```go
-cfg := gaze.Config{
+cfg := types.Config{
 	FollowSymlinks: true,
-	OnEvent: func(evt gaze.Event) {
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 }
@@ -181,7 +182,7 @@ if err != nil {
 ## Rename and overflow handling
 
 ```go
-if evt.Op&gaze.OpRename != 0 {
+if evt.Op&types.OpRename != 0 {
 	if evt.OldPath != "" {
 		fmt.Printf("renamed %s -> %s\n", evt.OldPath, evt.Path)
 	} else {
@@ -189,7 +190,7 @@ if evt.Op&gaze.OpRename != 0 {
 	}
 }
 
-if evt.Op&gaze.OpOverflow != 0 {
+if evt.Op&types.OpOverflow != 0 {
 	fmt.Println("overflow detected, rebuild expected state")
 }
 ```

@@ -44,9 +44,9 @@ func main() {
 }
 ```
 
-## Using `Config`
+## Using `types.Config`
 
-Use `WatchDirectoryWithConfig` when you want filters, callbacks, or your own logger.
+Use `WatchDirectoryWithConfig` with `go.ofkm.dev/gaze/types` when you want filters, callbacks, or your own logger.
 
 ```go
 package main
@@ -59,13 +59,14 @@ import (
 	"syscall"
 
 	"go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze/types"
 )
 
 func main() {
 	logger := slog.Default()
-	cfg := gaze.Config{
+	cfg := types.Config{
 		ExcludeGlobs: []string{"*.tmp", "*.swp", ".DS_Store"},
-		OnEvent: func(evt gaze.Event) {
+		OnEvent: func(evt types.Event) {
 			fmt.Println(evt)
 		},
 		OnError: func(err error) {
@@ -93,8 +94,8 @@ func main() {
 ## Watching one file
 
 ```go
-cfg := gaze.Config{
-	OnEvent: func(evt gaze.Event) {
+cfg := types.Config{
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 }
@@ -114,12 +115,12 @@ defer func() {
 
 ## Turning recursion off
 
-`WatchDirectory` is recursive by default. If you only want the top level, set `Recursion: gaze.RecursionDisabled`.
+`WatchDirectory` is recursive by default. If you only want the top level, set `Recursion: types.RecursionDisabled`.
 
 ```go
-cfg := gaze.Config{
-	Recursion: gaze.RecursionDisabled,
-	OnEvent: func(evt gaze.Event) {
+cfg := types.Config{
+	Recursion: types.RecursionDisabled,
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 }
@@ -135,7 +136,7 @@ if err != nil {
 Symlink roots are rejected unless you opt in.
 
 ```go
-cfg := gaze.Config{
+cfg := types.Config{
 	FollowSymlinks: true,
 }
 
@@ -147,4 +148,4 @@ if err != nil {
 
 ## Logging behavior
 
-If you leave out `Config.OnEvent` and `Config.OnError`, Gaze logs normalized events and runtime errors with `Config.Logger`. If `Config.Logger` is nil, it falls back to `slog.Default()`.
+If you leave out `types.Config.OnEvent` and `types.Config.OnError`, Gaze logs normalized events and runtime errors with `types.Config.Logger`. If `types.Config.Logger` is nil, it falls back to `slog.Default()`.

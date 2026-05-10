@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze/types"
 )
 
 func ExampleWatchDirectory() {
@@ -16,10 +17,10 @@ func ExampleWatchDirectory() {
 		_ = os.RemoveAll(root)
 	}()
 
-	events := make(chan gaze.Event, 1)
-	cfg := gaze.Config{
+	events := make(chan types.Event, 1)
+	cfg := types.Config{
 		ExcludeGlobs: []string{"*.tmp"},
-		OnEvent: func(evt gaze.Event) {
+		OnEvent: func(evt types.Event) {
 			select {
 			case events <- evt:
 			default:

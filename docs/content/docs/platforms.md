@@ -38,7 +38,7 @@ In practice, macOS works well for normal project sizes, but it is the least effi
 
 ## Cross-platform behavior
 
-All backends feed the same public `Event` type.
+All backends feed the same public `types.Event` type.
 
 - `OpRename` includes both paths when a rename can be paired
 - if pairing fails, you may see remove plus create instead

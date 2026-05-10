@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze/types"
 )
 
 func main() {
@@ -24,12 +25,12 @@ func run(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	w, err := gaze.NewWithConfig(gaze.Config{
-		Exclude: func(info gaze.PathInfo) bool {
+	w, err := gaze.NewWithConfig(types.Config{
+		Exclude: func(info types.PathInfo) bool {
 			return info.IsDir && info.Base == ".git"
 		},
-		Ops: gaze.OpCreate | gaze.OpWrite | gaze.OpRemove | gaze.OpRename,
-		OnEvent: func(evt gaze.Event) {
+		Ops: types.OpCreate | types.OpWrite | types.OpRemove | types.OpRename,
+		OnEvent: func(evt types.Event) {
 			fmt.Println(evt)
 		},
 		OnError: func(err error) {

@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"slices"
 	"testing"
+
+	"go.ofkm.dev/gaze/pkg/utils"
 )
 
 func TestWalkPath(t *testing.T) {
@@ -71,14 +73,14 @@ func TestHasPathPrefix(t *testing.T) {
 	descendant := filepath.Join(root, "file.txt")
 	other := filepath.Join(string(filepath.Separator), "tmp", "project-other")
 
-	if !hasPathPrefix(descendant, root) {
-		t.Fatal("hasPathPrefix(descendant) = false, want true")
+	if !utils.HasPathPrefix(descendant, root) {
+		t.Fatal("utils.HasPathPrefix(descendant) = false, want true")
 	}
-	if !hasPathPrefix(root, root) {
-		t.Fatal("hasPathPrefix(equal) = false, want true")
+	if !utils.HasPathPrefix(root, root) {
+		t.Fatal("utils.HasPathPrefix(equal) = false, want true")
 	}
-	if hasPathPrefix(other, root) {
-		t.Fatal("hasPathPrefix(non-descendant) = true, want false")
+	if utils.HasPathPrefix(other, root) {
+		t.Fatal("utils.HasPathPrefix(non-descendant) = true, want false")
 	}
 }
 

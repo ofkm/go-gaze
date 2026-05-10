@@ -9,13 +9,14 @@ import (
 	"go.ofkm.dev/gaze"
 	"go.ofkm.dev/gaze/internal/filter"
 	"go.ofkm.dev/gaze/internal/tree"
+	"go.ofkm.dev/gaze/types"
 )
 
 func BenchmarkWatchDirectoryCreateRemove(b *testing.B) {
 	root := b.TempDir()
 	payload := []byte{'x'}
-	cfg := gaze.Config{
-		OnEvent: func(gaze.Event) {},
+	cfg := types.Config{
+		OnEvent: func(types.Event) {},
 		OnError: func(error) {},
 	}
 
@@ -43,7 +44,7 @@ func BenchmarkWatchDirectoryCreateRemove(b *testing.B) {
 }
 
 func BenchmarkOpString(b *testing.B) {
-	op := gaze.OpCreate | gaze.OpWrite | gaze.OpRename | gaze.OpOverflow
+	op := types.OpCreate | types.OpWrite | types.OpRename | types.OpOverflow
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

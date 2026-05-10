@@ -8,11 +8,11 @@ weight: 2
 
 ```go
 func WatchDirectory(path string) (*Watcher, error)
-func WatchDirectoryWithConfig(path string, cfg Config) (*Watcher, error)
+func WatchDirectoryWithConfig(path string, cfg types.Config) (*Watcher, error)
 func WatchFile(path string) (*Watcher, error)
-func WatchFileWithConfig(path string, cfg Config) (*Watcher, error)
+func WatchFileWithConfig(path string, cfg types.Config) (*Watcher, error)
 func New() (*Watcher, error)
-func NewWithConfig(cfg Config) (*Watcher, error)
+func NewWithConfig(cfg types.Config) (*Watcher, error)
 ```
 
 - `WatchDirectory` is the simplest way to watch a directory recursively.
@@ -39,6 +39,8 @@ var ErrWatcherClosed = errors.New("gaze: watcher closed")
 ```
 
 ## Event model
+
+The public event and configuration data types live in `go.ofkm.dev/gaze/types`.
 
 ```go
 type Event struct {
@@ -69,11 +71,11 @@ const (
 
 - callbacks run on package-owned goroutines
 - `OpRename` can degrade to remove plus create when a backend cannot pair both sides
-- callback panics are recovered and forwarded to `Config.OnError` or the logger
+- callback panics are recovered and forwarded to `types.Config.OnError` or the logger
 
 ## Config
 
-`Config` is meant to be used as a plain struct literal. `Config{}` is valid.
+`types.Config` is meant to be used as a plain struct literal. `types.Config{}` is valid.
 
 ```go
 type Config struct {
@@ -124,7 +126,7 @@ type PathInfo struct {
 
 ## Defaults
 
-If you pass `Config{}`, Gaze uses these defaults:
+If you pass `types.Config{}`, Gaze uses these defaults:
 
 - directory watches are recursive
 - file watches stay file-only
@@ -138,17 +140,17 @@ If you pass `Config{}`, Gaze uses these defaults:
 ```go
 logger := slog.Default()
 
-cfg := gaze.Config{
-	Recursion:       gaze.RecursionEnabled,
+cfg := types.Config{
+	Recursion:       types.RecursionEnabled,
 	ExcludeGlobs:    []string{"*.tmp", "*.swp", ".DS_Store"},
 	ExcludePrefixes: []string{"/srv/app/.git", "/srv/app/node_modules"},
-	Exclude: func(info gaze.PathInfo) bool {
+	Exclude: func(info types.PathInfo) bool {
 		return info.IsDir && info.Base == "vendor"
 	},
-	Ops:            gaze.OpCreate | gaze.OpWrite | gaze.OpRename,
+	Ops:            types.OpCreate | types.OpWrite | types.OpRename,
 	QueueCapacity:  4096,
 	FollowSymlinks: false,
-	OnEvent: func(evt gaze.Event) {
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 	OnError: func(err error) {

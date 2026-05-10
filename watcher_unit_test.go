@@ -16,6 +16,7 @@ import (
 	"go.ofkm.dev/gaze/internal/filter"
 	"go.ofkm.dev/gaze/internal/queue"
 	"go.ofkm.dev/gaze/internal/tree"
+	"go.ofkm.dev/gaze/types"
 )
 
 type stubDriver struct {
@@ -69,7 +70,7 @@ func (d *stubDriver) Close() error {
 	return d.closeErr
 }
 
-func newUnitWatcher(t *testing.T, cfg Config, driver backend.Watcher) *Watcher {
+func newUnitWatcher(t *testing.T, cfg types.Config, driver backend.Watcher) *Watcher {
 	t.Helper()
 
 	matcher, err := filter.New(filter.Config{
@@ -79,7 +80,7 @@ func newUnitWatcher(t *testing.T, cfg Config, driver backend.Watcher) *Watcher {
 			if cfg.Exclude == nil {
 				return false
 			}
-			return cfg.Exclude(PathInfo{
+			return cfg.Exclude(types.PathInfo{
 				Path:  path,
 				Base:  filepath.Base(path),
 				IsDir: isDir,
@@ -100,7 +101,7 @@ func newUnitWatcher(t *testing.T, cfg Config, driver backend.Watcher) *Watcher {
 		matcher: matcher,
 		index:   tree.New(),
 		driver:  driver,
-		queue:   queue.New[Event](8),
+		queue:   queue.New[types.Event](8),
 		logger:  logger,
 		done:    make(chan struct{}),
 	}
@@ -109,30 +110,30 @@ func newUnitWatcher(t *testing.T, cfg Config, driver backend.Watcher) *Watcher {
 func TestOpString(t *testing.T) {
 	t.Parallel()
 
-	if got := (Op(0)).String(); got != "none" {
-		t.Fatalf("Op(0).String() = %q, want %q", got, "none")
+	if got := (types.Op(0)).String(); got != "none" {
+		t.Fatalf("types.Op(0).String() = %q, want %q", got, "none")
 	}
 
-	got := (OpCreate | OpWrite | OpRemove | OpRename | OpChmod | OpOverflow).String()
+	got := (types.OpCreate | types.OpWrite | types.OpRemove | types.OpRename | types.OpChmod | types.OpOverflow).String()
 	want := "create|write|remove|rename|chmod|overflow"
 	if got != want {
-		t.Fatalf("combined Op.String() = %q, want %q", got, want)
+		t.Fatalf("combined types.Op.String() = %q, want %q", got, want)
 	}
 }
 
 func TestEventString(t *testing.T) {
 	t.Parallel()
 
-	if got := (Event{Path: "/tmp/file.txt", Op: OpCreate}).String(); got != "GAZE[CREATE] /tmp/file.txt" {
-		t.Fatalf("create Event.String() = %q, want %q", got, "GAZE[CREATE] /tmp/file.txt")
+	if got := (types.Event{Path: "/tmp/file.txt", Op: types.OpCreate}).String(); got != "GAZE[CREATE] /tmp/file.txt" {
+		t.Fatalf("create types.Event.String() = %q, want %q", got, "GAZE[CREATE] /tmp/file.txt")
 	}
 
-	if got := (Event{OldPath: "/tmp/old.txt", Path: "/tmp/new.txt", Op: OpRename}).String(); got != "GAZE[RENAME] /tmp/old.txt -> /tmp/new.txt" {
-		t.Fatalf("rename Event.String() = %q, want %q", got, "GAZE[RENAME] /tmp/old.txt -> /tmp/new.txt")
+	if got := (types.Event{OldPath: "/tmp/old.txt", Path: "/tmp/new.txt", Op: types.OpRename}).String(); got != "GAZE[RENAME] /tmp/old.txt -> /tmp/new.txt" {
+		t.Fatalf("rename types.Event.String() = %q, want %q", got, "GAZE[RENAME] /tmp/old.txt -> /tmp/new.txt")
 	}
 
-	if got := (Event{Op: OpOverflow}).String(); got != "GAZE[OVERFLOW]" {
-		t.Fatalf("overflow Event.String() = %q, want %q", got, "GAZE[OVERFLOW]")
+	if got := (types.Event{Op: types.OpOverflow}).String(); got != "GAZE[OVERFLOW]" {
+		t.Fatalf("overflow types.Event.String() = %q, want %q", got, "GAZE[OVERFLOW]")
 	}
 }
 
@@ -140,42 +141,42 @@ func TestResolveConfigAndRecursionMode(t *testing.T) {
 	t.Parallel()
 
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
-	cfg := resolveConfig(Config{
-		Recursion:       RecursionEnabled,
+	cfg := resolveConfig(types.Config{
+		Recursion:       types.RecursionEnabled,
 		ExcludeGlobs:    []string{"*.tmp"},
 		ExcludePrefixes: []string{"/tmp/cache"},
-		OnEvent:         func(Event) {},
+		OnEvent:         func(types.Event) {},
 		OnError:         func(error) {},
 		Logger:          logger,
-		Ops:             OpCreate,
+		Ops:             types.OpCreate,
 		QueueCapacity:   0,
 		FollowSymlinks:  true,
 	})
 
-	if !cfg.recursiveEnabled(false) {
-		t.Fatal("Config{Recursion: RecursionEnabled}.recursiveEnabled(false) = false, want true")
+	if !recursiveEnabled(cfg, false) {
+		t.Fatal("recursiveEnabled(types.Config{Recursion: types.RecursionEnabled}, false) = false, want true")
 	}
 	if cfg.QueueCapacity != 1024 {
 		t.Fatalf("QueueCapacity = %d, want 1024", cfg.QueueCapacity)
 	}
-	if !cfg.Ops.Has(OpCreate) || !cfg.Ops.Has(OpOverflow) {
+	if !cfg.Ops.Has(types.OpCreate) || !cfg.Ops.Has(types.OpOverflow) {
 		t.Fatalf("Ops = %v, want create plus overflow", cfg.Ops)
 	}
 	if cfg.Logger != logger {
 		t.Fatal("Logger was not preserved")
 	}
-	if (Config{Recursion: RecursionDisabled}).recursiveEnabled(true) {
-		t.Fatal("RecursionDisabled should override default")
+	if recursiveEnabled(types.Config{Recursion: types.RecursionDisabled}, true) {
+		t.Fatal("types.RecursionDisabled should override default")
 	}
 
-	defaulted := resolveConfig(Config{})
+	defaulted := resolveConfig(types.Config{})
 	if defaulted.Logger == nil {
 		t.Fatal("default logger = nil, want non-nil")
 	}
-	if defaulted.Ops != allOps {
-		t.Fatalf("default Ops = %v, want %v", defaulted.Ops, allOps)
+	if defaulted.Ops != types.AllOps {
+		t.Fatalf("default Ops = %v, want %v", defaulted.Ops, types.AllOps)
 	}
-	if !(Config{}).recursiveEnabled(true) {
+	if !recursiveEnabled(types.Config{}, true) {
 		t.Fatal("default recursion should preserve provided default")
 	}
 }
@@ -189,7 +190,7 @@ func TestNormalizePathAndPrepareTarget(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	w := newUnitWatcher(t, Config{}, newStubDriver())
+	w := newUnitWatcher(t, types.Config{}, newStubDriver())
 
 	if _, err := w.normalizePath("   "); err == nil {
 		t.Fatal("normalizePath(empty) error = nil, want error")
@@ -234,7 +235,7 @@ func TestPrepareTargetExcludeAndSymlinkHandling(t *testing.T) {
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
-	w := newUnitWatcher(t, Config{ExcludeGlobs: []string{"*.tmp"}}, newStubDriver())
+	w := newUnitWatcher(t, types.Config{ExcludeGlobs: []string{"*.tmp"}}, newStubDriver())
 	if _, err := w.prepareTarget(excludedDir); err == nil || !strings.Contains(err.Error(), "excluded root") {
 		t.Fatalf("prepareTarget(excluded) error = %v, want excluded root error", err)
 	}
@@ -242,7 +243,7 @@ func TestPrepareTargetExcludeAndSymlinkHandling(t *testing.T) {
 		t.Fatalf("prepareTarget(symlink) error = %v, want follow symlinks error", err)
 	}
 
-	wFollow := newUnitWatcher(t, Config{FollowSymlinks: true}, newStubDriver())
+	wFollow := newUnitWatcher(t, types.Config{FollowSymlinks: true}, newStubDriver())
 	target, err := wFollow.prepareTarget(link)
 	if err != nil {
 		t.Fatalf("prepareTarget(symlink follow) error = %v", err)
@@ -261,7 +262,7 @@ func TestWatcherAddRemoveAndClose(t *testing.T) {
 
 	root := t.TempDir()
 	driver := newStubDriver()
-	w := newUnitWatcher(t, Config{}, driver)
+	w := newUnitWatcher(t, types.Config{}, driver)
 	go w.runEvents()
 
 	if err := w.Add(root); err != nil {
@@ -314,6 +315,12 @@ func TestWatcherAddRemoveAndClose(t *testing.T) {
 	if driver.closeCalls != 1 {
 		t.Fatalf("driver close calls = %d, want 1", driver.closeCalls)
 	}
+	if err := w.Add(root); !errors.Is(err, ErrWatcherClosed) {
+		t.Fatalf("Add(after Close) error = %v, want %v", err, ErrWatcherClosed)
+	}
+	if err := w.Remove(root); !errors.Is(err, ErrWatcherClosed) {
+		t.Fatalf("Remove(after Close) error = %v, want %v", err, ErrWatcherClosed)
+	}
 }
 
 func TestWatcherRunBackendAndDispatch(t *testing.T) {
@@ -321,10 +328,10 @@ func TestWatcherRunBackendAndDispatch(t *testing.T) {
 	path := filepath.Join(root, "file.txt")
 
 	driver := newStubDriver()
-	events := make(chan Event, 4)
+	events := make(chan types.Event, 4)
 	errs := make(chan error, 4)
-	w := newUnitWatcher(t, Config{
-		OnEvent: func(evt Event) {
+	w := newUnitWatcher(t, types.Config{
+		OnEvent: func(evt types.Event) {
 			events <- evt
 		},
 		OnError: func(err error) {
@@ -342,7 +349,7 @@ func TestWatcherRunBackendAndDispatch(t *testing.T) {
 
 	select {
 	case evt := <-events:
-		if evt.Path != path || !evt.Op.Has(OpCreate) {
+		if evt.Path != path || !evt.Op.Has(types.OpCreate) {
 			t.Fatalf("event = %+v, want create on %q", evt, path)
 		}
 	case <-time.After(time.Second):
@@ -377,9 +384,9 @@ func TestHandleBackendEventFilteringAndRename(t *testing.T) {
 	newDir := filepath.Join(root, "new")
 	excluded := filepath.Join(root, "skip.tmp")
 
-	w := newUnitWatcher(t, Config{
+	w := newUnitWatcher(t, types.Config{
 		ExcludeGlobs: []string{"*.tmp"},
-		Ops:          OpCreate | OpRename,
+		Ops:          types.OpCreate | types.OpRename,
 	}, newStubDriver())
 	if err := w.index.Add(tree.Root{Path: root, WatchPath: root, IsDir: true, Recursive: true}); err != nil {
 		t.Fatalf("index.Add(root) error = %v", err)
@@ -398,7 +405,7 @@ func TestHandleBackendEventFilteringAndRename(t *testing.T) {
 	if !ok {
 		t.Fatal("queue.Pop() = closed, want rename event")
 	}
-	if evt.Path != newDir || evt.OldPath != oldDir || !evt.Op.Has(OpRename) {
+	if evt.Path != newDir || evt.OldPath != oldDir || !evt.Op.Has(types.OpRename) {
 		t.Fatalf("rename event = %+v, want rename %q -> %q", evt, oldDir, newDir)
 	}
 	if !w.index.Matches(filepath.Join(newDir, "child.txt")) {
@@ -422,14 +429,14 @@ func TestHandleBackendEventFilteringAndRename(t *testing.T) {
 	w.queue.Close()
 	<-done
 
-	w.queue = queue.New[Event](8)
+	w.queue = queue.New[types.Event](8)
 	w.handleBackendEvent(backend.Event{Op: backend.OpOverflow})
 	overflow, ok := w.queue.Pop()
-	if !ok || overflow.Op != OpOverflow {
-		t.Fatalf("overflow event = %+v, %v, want OpOverflow", overflow, ok)
+	if !ok || overflow.Op != types.OpOverflow {
+		t.Fatalf("overflow event = %+v, %v, want types.OpOverflow", overflow, ok)
 	}
 
-	w.queue = queue.New[Event](8)
+	w.queue = queue.New[types.Event](8)
 	w.handleBackendEvent(backend.Event{
 		Path: excluded,
 		Op:   backend.OpCreate,
@@ -447,7 +454,7 @@ func TestHandleBackendEventFilteringAndRename(t *testing.T) {
 	w.queue.Close()
 	<-blocked
 
-	w.queue = queue.New[Event](8)
+	w.queue = queue.New[types.Event](8)
 	w.handleBackendEvent(backend.Event{
 		OldPath: excluded,
 		Op:      backend.OpRename,
@@ -471,12 +478,12 @@ func TestDispatchEventAndErrorLogging(t *testing.T) {
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
-	w := newUnitWatcher(t, Config{Logger: logger}, newStubDriver())
+	w := newUnitWatcher(t, types.Config{Logger: logger}, newStubDriver())
 
-	w.dispatchEvent(Event{
+	w.dispatchEvent(types.Event{
 		Path:    "/tmp/file.txt",
 		OldPath: filepath.Join(string(filepath.Separator), "tmp", "old.txt"),
-		Op:      OpRename,
+		Op:      types.OpRename,
 		IsDir:   false,
 	})
 	if got := buf.String(); !strings.Contains(got, "gaze event") || !strings.Contains(got, "old_path="+filepath.Join(string(filepath.Separator), "tmp", "old.txt")) {
@@ -499,7 +506,7 @@ func TestEmitErrorAndDispatchEventPanic(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
 	errs := make(chan error, 2)
-	w := newUnitWatcher(t, Config{
+	w := newUnitWatcher(t, types.Config{
 		Logger: logger,
 		OnError: func(err error) {
 			errs <- err
@@ -523,15 +530,15 @@ func TestEmitErrorAndDispatchEventPanic(t *testing.T) {
 		errs <- err
 	}
 
-	w.dispatchEvent(Event{Path: "/tmp/file.txt", Op: OpCreate})
+	w.dispatchEvent(types.Event{Path: "/tmp/file.txt", Op: types.OpCreate})
 	if got := buf.String(); !strings.Contains(got, "gaze event") {
 		t.Fatalf("dispatchEvent with nil handler wrote %q, want event log", got)
 	}
 
-	w.cfg.OnEvent = func(Event) {
+	w.cfg.OnEvent = func(types.Event) {
 		panic("event handler boom")
 	}
-	w.dispatchEvent(Event{Path: "/tmp/file.txt", Op: OpCreate})
+	w.dispatchEvent(types.Event{Path: "/tmp/file.txt", Op: types.OpCreate})
 	select {
 	case err := <-errs:
 		if err == nil || !strings.Contains(err.Error(), "event handler panic") {
@@ -549,7 +556,7 @@ func TestWatchDirectoryWithConfigAcceptsFilePath(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	w, err := WatchDirectoryWithConfig(file, Config{})
+	w, err := WatchDirectoryWithConfig(file, types.Config{})
 	if err != nil {
 		t.Fatalf("WatchDirectoryWithConfig() error = %v", err)
 	}
@@ -561,7 +568,7 @@ func TestWatchDirectoryWithConfigAcceptsFilePath(t *testing.T) {
 func TestWatchFileWithConfigAcceptsDirectoryPath(t *testing.T) {
 	dir := t.TempDir()
 
-	w, err := WatchFileWithConfig(dir, Config{})
+	w, err := WatchFileWithConfig(dir, types.Config{})
 	if err != nil {
 		t.Fatalf("WatchFileWithConfig() error = %v", err)
 	}
@@ -584,7 +591,7 @@ func TestWatchDirectoryWithConfigFollowsDirectorySymlink(t *testing.T) {
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
-	w, err := WatchDirectoryWithConfig(link, Config{FollowSymlinks: true})
+	w, err := WatchDirectoryWithConfig(link, types.Config{FollowSymlinks: true})
 	if err != nil {
 		t.Fatalf("WatchDirectoryWithConfig() error = %v", err)
 	}
@@ -603,7 +610,7 @@ func TestWatchFileWithConfigBrokenSymlinkFails(t *testing.T) {
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
-	w, err := WatchFileWithConfig(link, Config{FollowSymlinks: true})
+	w, err := WatchFileWithConfig(link, types.Config{FollowSymlinks: true})
 	if err == nil {
 		if w != nil {
 			_ = w.Close()
@@ -613,7 +620,7 @@ func TestWatchFileWithConfigBrokenSymlinkFails(t *testing.T) {
 }
 
 func TestNewWithConfigReturnsMatcherError(t *testing.T) {
-	_, err := NewWithConfig(Config{ExcludeGlobs: []string{"["}})
+	_, err := NewWithConfig(types.Config{ExcludeGlobs: []string{"["}})
 	if err == nil {
 		t.Fatal("expected invalid glob to fail")
 	}
@@ -628,7 +635,7 @@ func TestNewWithConfigReturnsBackendError(t *testing.T) {
 		return nil, want
 	}
 
-	_, err := NewWithConfig(Config{})
+	_, err := NewWithConfig(types.Config{})
 	if !errors.Is(err, want) {
 		t.Fatalf("NewWithConfig() error = %v, want %v", err, want)
 	}
@@ -640,10 +647,10 @@ func TestWatchConstructorsReturnNewWatcherErrors(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	if _, err := WatchDirectoryWithConfig(path, Config{ExcludeGlobs: []string{"["}}); err == nil {
+	if _, err := WatchDirectoryWithConfig(path, types.Config{ExcludeGlobs: []string{"["}}); err == nil {
 		t.Fatal("expected WatchDirectoryWithConfig to return constructor error")
 	}
-	if _, err := WatchFileWithConfig(path, Config{ExcludeGlobs: []string{"["}}); err == nil {
+	if _, err := WatchFileWithConfig(path, types.Config{ExcludeGlobs: []string{"["}}); err == nil {
 		t.Fatal("expected WatchFileWithConfig to return constructor error")
 	}
 }
@@ -666,7 +673,7 @@ func TestWatchDirectoryWithConfigJoinsAddAndCloseErrors(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	_, err := WatchDirectoryWithConfig(path, Config{})
+	_, err := WatchDirectoryWithConfig(path, types.Config{})
 	if err == nil || !errors.Is(err, addErr) || !errors.Is(err, closeErr) {
 		t.Fatalf("WatchDirectoryWithConfig() error = %v, want joined add+close error", err)
 	}
@@ -690,7 +697,7 @@ func TestWatchFileWithConfigJoinsAddAndCloseErrors(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	_, err := WatchFileWithConfig(path, Config{})
+	_, err := WatchFileWithConfig(path, types.Config{})
 	if err == nil || !errors.Is(err, addErr) || !errors.Is(err, closeErr) {
 		t.Fatalf("WatchFileWithConfig() error = %v, want joined add+close error", err)
 	}
@@ -715,7 +722,7 @@ func TestPrepareTargetRejectsSymlinkWithoutFollow(t *testing.T) {
 		t.Fatalf("filter.New() error = %v", err)
 	}
 
-	w := &Watcher{cfg: resolveConfig(Config{}), matcher: matcher}
+	w := &Watcher{cfg: resolveConfig(types.Config{}), matcher: matcher}
 	_, err = w.prepareTarget(link)
 	if err == nil || !strings.Contains(err.Error(), "FollowSymlinks") {
 		t.Fatalf("prepareTarget() error = %v, want symlink follow error", err)
@@ -735,7 +742,7 @@ func TestPrepareTargetRejectsExcludedRoot(t *testing.T) {
 		t.Fatalf("filter.New() error = %v", err)
 	}
 
-	w := &Watcher{cfg: resolveConfig(Config{}), matcher: matcher}
+	w := &Watcher{cfg: resolveConfig(types.Config{}), matcher: matcher}
 	_, err = w.prepareTarget(path)
 	if err == nil || !strings.Contains(err.Error(), "excluded root") {
 		t.Fatalf("prepareTarget() error = %v, want excluded root error", err)
@@ -772,10 +779,10 @@ func TestHandleBackendEventBranches(t *testing.T) {
 
 	t.Run("skips unmatched non-overflow", func(t *testing.T) {
 		w := &Watcher{
-			cfg:     resolveConfig(Config{}),
+			cfg:     resolveConfig(types.Config{}),
 			matcher: matcher,
 			index:   tree.New(),
-			queue:   queue.New[Event](1),
+			queue:   queue.New[types.Event](1),
 		}
 		w.handleBackendEvent(backend.Event{Path: filepath.Join(tmpRoot, "other"), Op: backend.OpWrite})
 		w.queue.Close()
@@ -786,25 +793,25 @@ func TestHandleBackendEventBranches(t *testing.T) {
 
 	t.Run("queues overflow without path match", func(t *testing.T) {
 		w := &Watcher{
-			cfg:     resolveConfig(Config{Ops: OpOverflow}),
+			cfg:     resolveConfig(types.Config{Ops: types.OpOverflow}),
 			matcher: matcher,
 			index:   tree.New(),
-			queue:   queue.New[Event](1),
+			queue:   queue.New[types.Event](1),
 		}
 		w.handleBackendEvent(backend.Event{Op: backend.OpOverflow})
 		w.queue.Close()
 		evt, ok := w.queue.Pop()
-		if !ok || evt.Op != OpOverflow {
+		if !ok || evt.Op != types.OpOverflow {
 			t.Fatalf("Pop() = (%v, %t), want overflow event", evt, ok)
 		}
 	})
 
 	t.Run("skips excluded old path without new path", func(t *testing.T) {
 		w := &Watcher{
-			cfg:     resolveConfig(Config{}),
+			cfg:     resolveConfig(types.Config{}),
 			matcher: matcher,
 			index:   tree.New(),
-			queue:   queue.New[Event](1),
+			queue:   queue.New[types.Event](1),
 		}
 		excludedPath := filepath.Join(tmpRoot, "excluded.txt")
 		if err := w.index.Add(tree.Root{Path: excludedPath}); err != nil {
@@ -823,7 +830,7 @@ func TestNewWatcherExcludeCallbackUsesPathInfo(t *testing.T) {
 	t.Cleanup(func() { newBackend = prev })
 
 	driver := newStubDriver()
-	var captured PathInfo
+	var captured types.PathInfo
 	newBackend = func(cfg backend.Config) (backend.Watcher, error) {
 		candidate := filepath.Join(string(filepath.Separator), "tmp", "example.txt")
 		if !cfg.ShouldExclude(candidate, false) {
@@ -832,8 +839,8 @@ func TestNewWatcherExcludeCallbackUsesPathInfo(t *testing.T) {
 		return driver, nil
 	}
 
-	w, err := NewWithConfig(Config{
-		Exclude: func(info PathInfo) bool {
+	w, err := NewWithConfig(types.Config{
+		Exclude: func(info types.PathInfo) bool {
 			captured = info
 			return info.Base == "example.txt" && !info.IsDir
 		},
@@ -842,7 +849,7 @@ func TestNewWatcherExcludeCallbackUsesPathInfo(t *testing.T) {
 		t.Fatalf("NewWithConfig() error = %v", err)
 	}
 	if captured.Path != filepath.Join(string(filepath.Separator), "tmp", "example.txt") || captured.Base != "example.txt" || captured.IsDir {
-		t.Fatalf("captured PathInfo = %+v", captured)
+		t.Fatalf("captured types.PathInfo = %+v", captured)
 	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
@@ -863,11 +870,11 @@ func TestWatcherAddAndRemoveBranches(t *testing.T) {
 		driver := newStubDriver()
 		driver.addErr = errors.New("driver boom")
 		w := &Watcher{
-			cfg:     resolveConfig(Config{}),
+			cfg:     resolveConfig(types.Config{}),
 			matcher: matcher,
 			index:   tree.New(),
 			driver:  driver,
-			queue:   queue.New[Event](1),
+			queue:   queue.New[types.Event](1),
 			done:    make(chan struct{}),
 		}
 
@@ -883,11 +890,11 @@ func TestWatcherAddAndRemoveBranches(t *testing.T) {
 	t.Run("remove missing returns not exist", func(t *testing.T) {
 		driver := newStubDriver()
 		w := &Watcher{
-			cfg:     resolveConfig(Config{}),
+			cfg:     resolveConfig(types.Config{}),
 			matcher: matcher,
 			index:   tree.New(),
 			driver:  driver,
-			queue:   queue.New[Event](1),
+			queue:   queue.New[types.Event](1),
 			done:    make(chan struct{}),
 		}
 
@@ -900,11 +907,11 @@ func TestWatcherAddAndRemoveBranches(t *testing.T) {
 		driver := newStubDriver()
 		driver.removeErr = errors.New("remove boom")
 		w := &Watcher{
-			cfg:     resolveConfig(Config{}),
+			cfg:     resolveConfig(types.Config{}),
 			matcher: matcher,
 			index:   tree.New(),
 			driver:  driver,
-			queue:   queue.New[Event](1),
+			queue:   queue.New[types.Event](1),
 			done:    make(chan struct{}),
 		}
 		path := filepath.Join(t.TempDir(), "file.txt")
@@ -924,7 +931,7 @@ func TestPrepareTargetMissingPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("filter.New() error = %v", err)
 	}
-	w := &Watcher{cfg: resolveConfig(Config{}), matcher: matcher}
+	w := &Watcher{cfg: resolveConfig(types.Config{}), matcher: matcher}
 	if _, err := w.prepareTarget(filepath.Join(t.TempDir(), "missing")); err == nil {
 		t.Fatal("expected prepareTarget to fail for missing path")
 	}
@@ -963,13 +970,13 @@ func TestNewAndWatchWrappers(t *testing.T) {
 		t.Fatalf("WatchFile().Close() error = %v", err)
 	}
 
-	if _, err := NewWithConfig(Config{ExcludeGlobs: []string{"["}}); err == nil {
+	if _, err := NewWithConfig(types.Config{ExcludeGlobs: []string{"["}}); err == nil {
 		t.Fatal("NewWithConfig(invalid glob) error = nil, want error")
 	}
-	if _, err := WatchDirectoryWithConfig(filepath.Join(root, "missing"), Config{}); err == nil {
+	if _, err := WatchDirectoryWithConfig(filepath.Join(root, "missing"), types.Config{}); err == nil {
 		t.Fatal("WatchDirectoryWithConfig(missing path) error = nil, want error")
 	}
-	if _, err := WatchFileWithConfig(filepath.Join(root, "missing.txt"), Config{}); err == nil {
+	if _, err := WatchFileWithConfig(filepath.Join(root, "missing.txt"), types.Config{}); err == nil {
 		t.Fatal("WatchFileWithConfig(missing path) error = nil, want error")
 	}
 }

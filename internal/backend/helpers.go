@@ -29,7 +29,3 @@ func walkPath(root string, recursive bool, shouldExclude func(path string, isDir
 		return fn(path, d)
 	})
 }
-
-func hasPathPrefix(path, prefix string) bool {
-	return path == prefix || len(path) > len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == filepath.Separator
-}

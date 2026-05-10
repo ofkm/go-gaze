@@ -9,16 +9,17 @@ import (
 	"time"
 
 	"go.ofkm.dev/gaze"
+	"go.ofkm.dev/gaze/types"
 )
 
 func TestWatchDirectoryLifecycle(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	events := make(chan gaze.Event, 32)
+	events := make(chan types.Event, 32)
 	errs := make(chan error, 32)
-	cfg := gaze.Config{
-		OnEvent: func(evt gaze.Event) {
+	cfg := types.Config{
+		OnEvent: func(evt types.Event) {
 			events <- evt
 		},
 		OnError: func(err error) {
@@ -40,22 +41,22 @@ func TestWatchDirectoryLifecycle(t *testing.T) {
 	if err := os.WriteFile(target, []byte("one"), 0o644); err != nil {
 		t.Fatalf("WriteFile(create) error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
-		return evt.Path == target && evt.Op.Has(gaze.OpCreate)
+	waitForEvent(t, events, errs, func(evt types.Event) bool {
+		return evt.Path == target && evt.Op.Has(types.OpCreate)
 	})
 
 	if err := os.WriteFile(target, []byte("two"), 0o644); err != nil {
 		t.Fatalf("WriteFile(update) error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
-		return evt.Path == target && evt.Op.Has(gaze.OpWrite)
+	waitForEvent(t, events, errs, func(evt types.Event) bool {
+		return evt.Path == target && evt.Op.Has(types.OpWrite)
 	})
 
 	if err := os.Remove(target); err != nil {
 		t.Fatalf("Remove() error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
-		return evt.Path == target && evt.Op.Has(gaze.OpRemove)
+	waitForEvent(t, events, errs, func(evt types.Event) bool {
+		return evt.Path == target && evt.Op.Has(types.OpRemove)
 	})
 }
 
@@ -63,11 +64,11 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	events := make(chan gaze.Event, 32)
+	events := make(chan types.Event, 32)
 	errs := make(chan error, 32)
-	cfg := gaze.Config{
+	cfg := types.Config{
 		ExcludeGlobs: []string{"*.tmp"},
-		OnEvent: func(evt gaze.Event) {
+		OnEvent: func(evt types.Event) {
 			events <- evt
 		},
 		OnError: func(err error) {
@@ -89,23 +90,23 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 	if err := os.Mkdir(subdir, 0o755); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
-		return evt.Path == subdir && evt.IsDir && evt.Op.Has(gaze.OpCreate)
+	waitForEvent(t, events, errs, func(evt types.Event) bool {
+		return evt.Path == subdir && evt.IsDir && evt.Op.Has(types.OpCreate)
 	})
 
 	nested := filepath.Join(subdir, "keep.txt")
 	if err := os.WriteFile(nested, []byte("hello"), 0o644); err != nil {
 		t.Fatalf("WriteFile(nested) error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
-		return evt.Path == nested && evt.Op.Has(gaze.OpCreate)
+	waitForEvent(t, events, errs, func(evt types.Event) bool {
+		return evt.Path == nested && evt.Op.Has(types.OpCreate)
 	})
 
 	excluded := filepath.Join(root, "skip.tmp")
 	if err := os.WriteFile(excluded, []byte("nope"), 0o644); err != nil {
 		t.Fatalf("WriteFile(excluded) error = %v", err)
 	}
-	assertNoEvent(t, events, errs, func(evt gaze.Event) bool {
+	assertNoEvent(t, events, errs, func(evt types.Event) bool {
 		return evt.Path == excluded
 	})
 }
@@ -114,11 +115,11 @@ func TestWatchDirectoryNonRecursive(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	events := make(chan gaze.Event, 32)
+	events := make(chan types.Event, 32)
 	errs := make(chan error, 32)
-	cfg := gaze.Config{
-		Recursion: gaze.RecursionDisabled,
-		OnEvent: func(evt gaze.Event) {
+	cfg := types.Config{
+		Recursion: types.RecursionDisabled,
+		OnEvent: func(evt types.Event) {
 			events <- evt
 		},
 		OnError: func(err error) {
@@ -140,15 +141,15 @@ func TestWatchDirectoryNonRecursive(t *testing.T) {
 	if err := os.Mkdir(subdir, 0o755); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
-	waitForEvent(t, events, errs, func(evt gaze.Event) bool {
-		return evt.Path == subdir && evt.IsDir && evt.Op.Has(gaze.OpCreate)
+	waitForEvent(t, events, errs, func(evt types.Event) bool {
+		return evt.Path == subdir && evt.IsDir && evt.Op.Has(types.OpCreate)
 	})
 
 	nested := filepath.Join(subdir, "child.txt")
 	if err := os.WriteFile(nested, []byte("hello"), 0o644); err != nil {
 		t.Fatalf("WriteFile(nested) error = %v", err)
 	}
-	assertNoEvent(t, events, errs, func(evt gaze.Event) bool {
+	assertNoEvent(t, events, errs, func(evt types.Event) bool {
 		return evt.Path == nested
 	})
 }
@@ -158,10 +159,10 @@ func TestWatchDirectoryOnEvent(t *testing.T) {
 
 	root := t.TempDir()
 
-	received := make(chan gaze.Event, 8)
+	received := make(chan types.Event, 8)
 	errs := make(chan error, 8)
-	cfg := gaze.Config{
-		OnEvent: func(evt gaze.Event) {
+	cfg := types.Config{
+		OnEvent: func(evt types.Event) {
 			received <- evt
 		},
 		OnError: func(err error) {
@@ -188,7 +189,7 @@ func TestWatchDirectoryOnEvent(t *testing.T) {
 	for {
 		select {
 		case evt := <-received:
-			if evt.Path == target && evt.Op.Has(gaze.OpCreate) {
+			if evt.Path == target {
 				select {
 				case err := <-errs:
 					t.Fatalf("unexpected watcher error: %v", err)
@@ -211,8 +212,8 @@ func TestWatchDirectoryOnEventPanicBecomesError(t *testing.T) {
 
 	var once sync.Once
 	errs := make(chan error, 8)
-	cfg := gaze.Config{
-		OnEvent: func(gaze.Event) {
+	cfg := types.Config{
+		OnEvent: func(types.Event) {
 			once.Do(func() {
 				panic("boom")
 			})
@@ -247,7 +248,7 @@ func TestWatchDirectoryOnEventPanicBecomesError(t *testing.T) {
 	}
 }
 
-func waitForEvent(t *testing.T, events <-chan gaze.Event, errs <-chan error, match func(gaze.Event) bool) {
+func waitForEvent(t *testing.T, events <-chan types.Event, errs <-chan error, match func(types.Event) bool) {
 	t.Helper()
 
 	deadline := time.After(5 * time.Second)
@@ -267,7 +268,7 @@ func waitForEvent(t *testing.T, events <-chan gaze.Event, errs <-chan error, mat
 	}
 }
 
-func assertNoEvent(t *testing.T, events <-chan gaze.Event, errs <-chan error, match func(gaze.Event) bool) {
+func assertNoEvent(t *testing.T, events <-chan types.Event, errs <-chan error, match func(types.Event) bool) {
 	t.Helper()
 
 	timeout := time.After(400 * time.Millisecond)

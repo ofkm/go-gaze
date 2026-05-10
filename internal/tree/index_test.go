@@ -3,6 +3,8 @@ package tree
 import (
 	"path/filepath"
 	"testing"
+
+	"go.ofkm.dev/gaze/pkg/utils"
 )
 
 func TestIndexMatchesAndMovePrefix(t *testing.T) {
@@ -49,8 +51,8 @@ func TestJoinMovedPath(t *testing.T) {
 	oldRoot := filepath.Join(string(filepath.Separator), "old")
 	newRoot := filepath.Join(string(filepath.Separator), "new")
 	want := filepath.Join(newRoot, "child", "file.txt")
-	if got := joinMovedPath(filepath.Join(oldRoot, "child", "file.txt"), oldRoot, newRoot); got != want {
-		t.Fatalf("joinMovedPath() = %q, want %q", got, want)
+	if got := utils.JoinMovedPath(filepath.Join(oldRoot, "child", "file.txt"), oldRoot, newRoot); got != want {
+		t.Fatalf("utils.JoinMovedPath() = %q, want %q", got, want)
 	}
 }
 
@@ -108,11 +110,11 @@ func TestIndexMovePrefixIgnoresUnrelatedPrefix(t *testing.T) {
 func TestJoinMovedPathExactAndNested(t *testing.T) {
 	oldRoot := filepath.Join(string(filepath.Separator), "tmp", "old")
 	newRoot := filepath.Join(string(filepath.Separator), "tmp", "new")
-	if got := joinMovedPath(oldRoot, oldRoot, newRoot); got != newRoot {
-		t.Fatalf("joinMovedPath() = %q, want %q", got, newRoot)
+	if got := utils.JoinMovedPath(oldRoot, oldRoot, newRoot); got != newRoot {
+		t.Fatalf("utils.JoinMovedPath() = %q, want %q", got, newRoot)
 	}
 	want := filepath.Join(newRoot, "nested", "file.txt")
-	if got := joinMovedPath(filepath.Join(oldRoot, "nested", "file.txt"), oldRoot, newRoot); got != want {
-		t.Fatalf("joinMovedPath() = %q, want %q", got, want)
+	if got := utils.JoinMovedPath(filepath.Join(oldRoot, "nested", "file.txt"), oldRoot, newRoot); got != want {
+		t.Fatalf("utils.JoinMovedPath() = %q, want %q", got, want)
 	}
 }

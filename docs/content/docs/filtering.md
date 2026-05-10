@@ -14,9 +14,9 @@ That matters for large trees. Good filters reduce both watch count and callback 
 ## Glob excludes
 
 ```go
-cfg := gaze.Config{
+cfg := types.Config{
 	ExcludeGlobs: []string{"*.tmp", "*.swp", ".DS_Store"},
-	OnEvent: func(gaze.Event) {},
+	OnEvent: func(types.Event) {},
 }
 
 w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
@@ -31,12 +31,12 @@ if err != nil {
 ## Prefix excludes
 
 ```go
-cfg := gaze.Config{
+cfg := types.Config{
 	ExcludePrefixes: []string{
 		"/absolute/path/to/my-directory/.git",
 		"/absolute/path/to/my-directory/node_modules",
 	},
-	OnEvent: func(gaze.Event) {},
+	OnEvent: func(types.Event) {},
 }
 
 w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
@@ -50,11 +50,11 @@ Use prefix excludes for directories you never want to watch at all.
 ## Predicate excludes
 
 ```go
-cfg := gaze.Config{
-	Exclude: func(info gaze.PathInfo) bool {
+cfg := types.Config{
+	Exclude: func(info types.PathInfo) bool {
 		return info.IsDir && info.Base == "vendor"
 	},
-	OnEvent: func(gaze.Event) {},
+	OnEvent: func(types.Event) {},
 }
 
 w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
@@ -68,9 +68,9 @@ Use `Exclude` when globs and prefixes are not quite enough.
 ## Op filtering
 
 ```go
-cfg := gaze.Config{
-	Ops: gaze.OpCreate | gaze.OpWrite | gaze.OpRename,
-	OnEvent: func(evt gaze.Event) {
+cfg := types.Config{
+	Ops: types.OpCreate | types.OpWrite | types.OpRename,
+	OnEvent: func(evt types.Event) {
 		fmt.Println(evt)
 	},
 }

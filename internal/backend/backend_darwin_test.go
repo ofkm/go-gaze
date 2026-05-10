@@ -4,6 +4,7 @@ package backend
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,6 +14,12 @@ import (
 
 	"golang.org/x/sys/unix"
 )
+
+func copySnapshot(src map[string]entryMeta) map[string]entryMeta {
+	dst := make(map[string]entryMeta, len(src))
+	maps.Copy(dst, src)
+	return dst
+}
 
 func openPathForTest(t *testing.T, path string, isDir bool) int {
 	t.Helper()
@@ -371,6 +378,83 @@ func TestDarwinWatcherRescanDir(t *testing.T) {
 	}
 
 	w.removePrefix(root)
+}
+
+func TestDarwinWatcherRescanDirSuppressesAlreadyRemovedPath(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	filePath := filepath.Join(root, "helper")
+	if err := os.WriteFile(filePath, []byte("file"), 0o644); err != nil {
+		t.Fatalf("WriteFile(file) error = %v", err)
+	}
+
+	kq, err := unix.Kqueue()
+	if err != nil {
+		t.Fatalf("Kqueue() error = %v", err)
+	}
+	defer func() {
+		_ = unix.Close(kq)
+	}()
+
+	rootFD := openPathForTest(t, root, true)
+	fileFD := openPathForTest(t, filePath, false)
+	w := &darwinWatcher{
+		cfg: Config{},
+		kq:  kq,
+		roots: map[string]Target{
+			root: {Path: root, WatchPath: root, IsDir: true, Recursive: true},
+		},
+		rootNodes: map[string]map[string]struct{}{
+			root: {
+				root:     {},
+				filePath: {},
+			},
+		},
+		watched: map[string]*darwinNode{
+			root: {
+				fd:    rootFD,
+				path:  root,
+				isDir: true,
+				roots: []string{root},
+			},
+			filePath: {
+				fd:    fileFD,
+				path:  filePath,
+				isDir: false,
+				roots: []string{root},
+			},
+		},
+		fdToPath: map[uintptr]string{
+			darwinFDKey(rootFD): root,
+			darwinFDKey(fileFD): filePath,
+		},
+		snapshots: map[string]map[string]entryMeta{},
+		events:    make(chan Event, 4),
+		errors:    make(chan error, 1),
+	}
+	w.snapshots[root] = w.readDirSnapshot(root)
+
+	if err := os.Remove(filePath); err != nil {
+		t.Fatalf("Remove(file) error = %v", err)
+	}
+	w.handle(unix.Kevent_t{Ident: uint64(fileFD), Fflags: unix.NOTE_DELETE})
+	w.rescanDir(root)
+
+	removes := 0
+	for {
+		select {
+		case evt := <-w.events:
+			if evt.Path == filePath && evt.Op == OpRemove {
+				removes++
+			}
+		default:
+			if removes != 1 {
+				t.Fatalf("remove events for %q = %d, want 1", filePath, removes)
+			}
+			return
+		}
+	}
 }
 
 func TestDarwinWatcherHandle(t *testing.T) {

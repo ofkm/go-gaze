@@ -1,9 +1,9 @@
 package tree
 
 import (
-	"path/filepath"
-	"strings"
 	"sync"
+
+	"go.ofkm.dev/gaze/pkg/utils"
 )
 
 type Root struct {
@@ -54,37 +54,41 @@ func (i *Index) MovePrefix(oldPath, newPath string) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	var toDelete []string
-	var toAdd []Root
+	var updated map[string]Root
 	for key, root := range i.roots {
-		changed := false
+		rootChanged := false
 		if root.Path == oldPath {
 			root.Path = newPath
-			changed = true
-		} else if root.IsDir && hasPathPrefix(root.Path, oldPath) {
-			root.Path = joinMovedPath(root.Path, oldPath, newPath)
-			changed = true
+			rootChanged = true
+		} else if root.IsDir && utils.HasPathPrefix(root.Path, oldPath) {
+			root.Path = utils.JoinMovedPath(root.Path, oldPath, newPath)
+			rootChanged = true
 		}
 
 		if root.WatchPath == oldPath {
 			root.WatchPath = newPath
-		} else if hasPathPrefix(root.WatchPath, oldPath) {
-			root.WatchPath = joinMovedPath(root.WatchPath, oldPath, newPath)
+			rootChanged = true
+		} else if utils.HasPathPrefix(root.WatchPath, oldPath) {
+			root.WatchPath = utils.JoinMovedPath(root.WatchPath, oldPath, newPath)
+			rootChanged = true
 		}
 
-		if changed {
-			toDelete = append(toDelete, key)
-			toAdd = append(toAdd, root)
-		} else {
-			i.roots[key] = root
+		if rootChanged {
+			if updated == nil {
+				updated = make(map[string]Root, len(i.roots))
+				for existingKey, existingRoot := range i.roots {
+					updated[existingKey] = existingRoot
+				}
+			}
+			delete(updated, key)
+			updated[root.Path] = root
+			continue
 		}
 	}
-	for _, key := range toDelete {
-		delete(i.roots, key)
+	if updated == nil {
+		return
 	}
-	for _, root := range toAdd {
-		i.roots[root.Path] = root
-	}
+	i.roots = updated
 	i.rebuild()
 }
 
@@ -96,7 +100,7 @@ func (i *Index) Matches(path string) bool {
 		return true
 	}
 
-	parent := parentDir(path)
+	parent := utils.ParentDir(path)
 	if _, ok := i.flatDirs[parent]; ok {
 		return true
 	}
@@ -106,25 +110,12 @@ func (i *Index) Matches(path string) bool {
 		if _, ok := i.recursiveDirs[current]; ok {
 			return true
 		}
-		next := parentDir(current)
+		next := utils.ParentDir(current)
 		if next == current {
 			return false
 		}
 		current = next
 	}
-}
-
-// parentDir returns the parent directory of path using zero-allocation
-// string slicing instead of filepath.Dir.
-func parentDir(path string) string {
-	idx := strings.LastIndexByte(path, filepath.Separator)
-	if idx < 0 {
-		return "."
-	}
-	if idx == 0 {
-		return string(filepath.Separator)
-	}
-	return path[:idx]
 }
 
 func (i *Index) rebuild() {
@@ -142,16 +133,4 @@ func (i *Index) rebuild() {
 			i.fileRoots[root.Path] = struct{}{}
 		}
 	}
-}
-
-func hasPathPrefix(path, prefix string) bool {
-	return path == prefix || len(path) > len(prefix) && path[:len(prefix)] == prefix && path[len(prefix)] == filepath.Separator
-}
-
-func joinMovedPath(path, oldPath, newPath string) string {
-	if path == oldPath {
-		return newPath
-	}
-	rel := path[len(oldPath):]
-	return filepath.Clean(newPath + rel)
 }
