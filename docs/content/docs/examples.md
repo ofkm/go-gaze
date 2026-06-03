@@ -43,7 +43,7 @@ func run(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	w, err := gaze.NewWithConfig(types.Config{
+	w, err := gaze.New(types.Config{
 		Exclude: func(info types.PathInfo) bool {
 			return info.IsDir && info.Base == ".git"
 		},
@@ -87,7 +87,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.WatchFileWithConfig("config.yaml", cfg)
+w, err := gaze.WatchFile("config.yaml", cfg)
 if err != nil {
 	panic(err)
 }
@@ -110,7 +110,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.NewWithConfig(cfg)
+w, err := gaze.New(cfg)
 if err != nil {
 	panic(err)
 }
@@ -141,7 +141,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -155,7 +155,7 @@ cfg := types.Config{
 	Logger: logger,
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -173,7 +173,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("link-or-tree-root", cfg)
+w, err := gaze.WatchDirectory("link-or-tree-root", cfg)
 if err != nil {
 	panic(err)
 }

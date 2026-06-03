@@ -27,7 +27,7 @@ func TestWatchDirectoryLifecycle(t *testing.T) {
 		},
 	}
 
-	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectory(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -76,7 +76,7 @@ func TestWatchDirectoryRecursiveAndExclude(t *testing.T) {
 		},
 	}
 
-	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectory(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -127,9 +127,9 @@ func TestWatchDirectoryNonRecursive(t *testing.T) {
 		},
 	}
 
-	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectory(root, cfg)
 	if err != nil {
-		t.Fatalf("WatchDirectoryWithConfig() error = %v", err)
+		t.Fatalf("WatchDirectory() error = %v", err)
 	}
 	defer func() {
 		if err := w.Close(); err != nil {
@@ -170,7 +170,7 @@ func TestWatchDirectoryOnEvent(t *testing.T) {
 		},
 	}
 
-	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectory(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}
@@ -223,7 +223,7 @@ func TestWatchDirectoryOnEventPanicBecomesError(t *testing.T) {
 		},
 	}
 
-	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectory(root, cfg)
 	if err != nil {
 		t.Fatalf("WatchDirectory() error = %v", err)
 	}

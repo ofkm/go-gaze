@@ -22,6 +22,15 @@ var (
 	newBackend = backend.New
 )
 
+// Watcher observes one or more filesystem roots and delivers normalized
+// [types.Event] values to the callbacks configured in its [types.Config].
+//
+// A Watcher owns its goroutines and must be released with [Watcher.Close]. Its
+// methods are safe to call from multiple goroutines. Event and error callbacks
+// run on goroutines owned by the Watcher, not the caller's (see [types.Config]).
+//
+// The zero value is not usable; obtain a Watcher from [New], [WatchDirectory],
+// or [WatchFile].
 type Watcher struct {
 	cfg     types.Config
 	matcher *filter.Matcher
@@ -36,15 +45,74 @@ type Watcher struct {
 	done      chan struct{}
 }
 
-func WatchDirectory(path string) (*Watcher, error) {
-	return WatchDirectoryWithConfig(path, types.Config{})
-}
-
-func WatchDirectoryWithConfig(path string, cfg types.Config) (*Watcher, error) {
-	w, err := NewWithConfig(cfg)
+// New creates an empty Watcher with no roots; call [Watcher.Add] to enroll
+// paths. With no argument it uses default configuration; pass a single
+// [types.Config] to customize. Passing more than one Config is an error.
+//
+// For the common single-root case, prefer [WatchDirectory] or [WatchFile].
+func New(cfg ...types.Config) (*Watcher, error) {
+	c, err := pickConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
+	return newWatcher(resolveConfig(c))
+}
+
+// WatchDirectory creates a Watcher and starts watching path, normally a
+// directory. Directories are watched recursively by default; set
+// Config.Recursion to [types.RecursionDisabled] to watch only the top level.
+// With no argument it uses defaults; pass a single [types.Config] to customize.
+// Passing more than one Config is an error.
+//
+// path is normalized to an absolute path. It may also name a file, in which
+// case it behaves like [WatchFile], though WatchFile states that intent more
+// clearly.
+func WatchDirectory(path string, cfg ...types.Config) (*Watcher, error) {
+	w, err := New(cfg...)
+	if err != nil {
+		return nil, err
+	}
+	return watchRoot(w, path)
+}
+
+// WatchFile creates a Watcher and starts watching the single file at path.
+//
+// Gaze does not watch the file inode directly: it watches the file's parent
+// directory non-recursively and delivers only events for path. Recursion is
+// forced off regardless of Config. With no argument it uses defaults; pass a
+// single [types.Config] to customize. Passing more than one Config is an error.
+func WatchFile(path string, cfg ...types.Config) (*Watcher, error) {
+	c, err := pickConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	c = resolveConfig(c)
+	c.Recursion = types.RecursionDisabled
+
+	w, err := newWatcher(c)
+	if err != nil {
+		return nil, err
+	}
+	return watchRoot(w, path)
+}
+
+// pickConfig returns the single optional Config, or the zero Config when none
+// is supplied. More than one Config is rejected so a mistaken extra argument is
+// never silently dropped.
+func pickConfig(cfg []types.Config) (types.Config, error) {
+	switch len(cfg) {
+	case 0:
+		return types.Config{}, nil
+	case 1:
+		return cfg[0], nil
+	default:
+		return types.Config{}, errors.New("gaze: at most one Config may be provided")
+	}
+}
+
+// watchRoot adds path to w, closing w if the add fails so the caller never
+// receives a live watcher it cannot use.
+func watchRoot(w *Watcher, path string) (*Watcher, error) {
 	if err := w.Add(path); err != nil {
 		if closeErr := w.Close(); closeErr != nil {
 			return nil, errors.Join(err, closeErr)
@@ -52,35 +120,6 @@ func WatchDirectoryWithConfig(path string, cfg types.Config) (*Watcher, error) {
 		return nil, err
 	}
 	return w, nil
-}
-
-func WatchFile(path string) (*Watcher, error) {
-	return WatchFileWithConfig(path, types.Config{})
-}
-
-func WatchFileWithConfig(path string, cfg types.Config) (*Watcher, error) {
-	cfg = resolveConfig(cfg)
-	cfg.Recursion = types.RecursionDisabled
-
-	w, err := newWatcher(cfg)
-	if err != nil {
-		return nil, err
-	}
-	if err := w.Add(path); err != nil {
-		if closeErr := w.Close(); closeErr != nil {
-			return nil, errors.Join(err, closeErr)
-		}
-		return nil, err
-	}
-	return w, nil
-}
-
-func New() (*Watcher, error) {
-	return NewWithConfig(types.Config{})
-}
-
-func NewWithConfig(cfg types.Config) (*Watcher, error) {
-	return newWatcher(resolveConfig(cfg))
 }
 
 func newWatcher(cfg types.Config) (*Watcher, error) {
@@ -132,6 +171,13 @@ func newWatcher(cfg types.Config) (*Watcher, error) {
 	return w, nil
 }
 
+// Add starts watching the file or directory at path, which is normalized to an
+// absolute path. Directories are watched according to Config.Recursion; a file
+// is watched through its parent directory (see [WatchFile]).
+//
+// Add returns [ErrWatcherClosed] if the Watcher is closed, an error if path
+// cannot be stat'd, an error if path is a symlink and Config.FollowSymlinks is
+// false, and an error if path is excluded by the configured filters.
 func (w *Watcher) Add(path string) error {
 	if w.closed.Load() {
 		return ErrWatcherClosed
@@ -167,6 +213,12 @@ func (w *Watcher) Add(path string) error {
 	return nil
 }
 
+// Remove stops watching a root previously passed to [Watcher.Add] or a
+// constructor. path is normalized the same way as Add but must name an exact
+// root: Remove does not match descendants of a watched directory.
+//
+// Remove returns [ErrWatcherClosed] if the Watcher is closed and os.ErrNotExist
+// if path is not a current root.
 func (w *Watcher) Remove(path string) error {
 	if w.closed.Load() {
 		return ErrWatcherClosed
@@ -191,6 +243,9 @@ func (w *Watcher) Remove(path string) error {
 	return nil
 }
 
+// Close stops all watching, releases backend resources, and waits for in-flight
+// event dispatch to drain. It is idempotent and safe to call multiple times and
+// from multiple goroutines; every call returns the same error.
 func (w *Watcher) Close() error {
 	w.closeOnce.Do(func() {
 		w.closed.Store(true)

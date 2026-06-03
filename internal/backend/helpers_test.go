@@ -9,7 +9,7 @@ import (
 	"slices"
 	"testing"
 
-	"go.ofkm.dev/gaze/pkg/utils"
+	"go.ofkm.dev/gaze/internal/utils"
 )
 
 func TestWalkPath(t *testing.T) {

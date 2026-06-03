@@ -20,7 +20,7 @@ func BenchmarkWatchDirectoryCreateRemove(b *testing.B) {
 		OnError: func(error) {},
 	}
 
-	w, err := gaze.WatchDirectoryWithConfig(root, cfg)
+	w, err := gaze.WatchDirectory(root, cfg)
 	if err != nil {
 		b.Fatalf("WatchDirectory() error = %v", err)
 	}

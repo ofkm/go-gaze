@@ -7,7 +7,8 @@ import (
 	"go.ofkm.dev/gaze/types"
 )
 
-// ErrWatcherClosed is returned when an operation is attempted after Close.
+// ErrWatcherClosed is returned by [Watcher.Add] and [Watcher.Remove] when they
+// are called after [Watcher.Close]. Test for it with errors.Is.
 var ErrWatcherClosed = errors.New("gaze: watcher closed")
 
 func defaultConfig() types.Config {

@@ -46,7 +46,7 @@ func main() {
 
 ## Using `types.Config`
 
-Use `WatchDirectoryWithConfig` with `go.ofkm.dev/gaze/types` when you want filters, callbacks, or your own logger.
+Pass a `types.Config` (from `go.ofkm.dev/gaze/types`) to any constructor when you want filters, callbacks, or your own logger. The config argument is optional — omit it for defaults.
 
 ```go
 package main
@@ -74,7 +74,7 @@ func main() {
 		},
 	}
 
-	w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+	w, err := gaze.WatchDirectory("my-directory", cfg)
 	if err != nil {
 		logger.Error("watch directory", "path", "my-directory", "err", err)
 		os.Exit(1)
@@ -100,7 +100,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.WatchFileWithConfig("config.yaml", cfg)
+w, err := gaze.WatchFile("config.yaml", cfg)
 if err != nil {
 	panic(err)
 }
@@ -111,7 +111,7 @@ defer func() {
 }()
 ```
 
-`WatchFile` and `WatchFileWithConfig` watch the parent directory and only deliver events for the file you asked for.
+`WatchFile` watches the parent directory and only delivers events for the file you asked for.
 
 ## Turning recursion off
 
@@ -125,7 +125,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("/srv/app", cfg)
+w, err := gaze.WatchDirectory("/srv/app", cfg)
 if err != nil {
 	panic(err)
 }
@@ -140,7 +140,7 @@ cfg := types.Config{
 	FollowSymlinks: true,
 }
 
-w, err := gaze.WatchDirectoryWithConfig("./relative/path", cfg)
+w, err := gaze.WatchDirectory("./relative/path", cfg)
 if err != nil {
 	panic(err)
 }

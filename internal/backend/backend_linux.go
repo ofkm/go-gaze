@@ -11,7 +11,7 @@ import (
 	"time"
 	"unsafe"
 
-	"go.ofkm.dev/gaze/pkg/utils"
+	"go.ofkm.dev/gaze/internal/utils"
 	"golang.org/x/sys/unix"
 )
 
@@ -222,6 +222,11 @@ func (w *linuxWatcher) run() {
 			raw := (*unix.InotifyEvent)(unsafe.Pointer(&buf[offset]))
 			offset += unix.SizeofInotifyEvent
 
+			// Defensive: the kernel always delivers whole events, but guard the
+			// name slice against a malformed Len rather than risk an out-of-range.
+			if offset+int(raw.Len) > read {
+				break
+			}
 			nameBytes := buf[offset : offset+int(raw.Len)]
 			offset += int(raw.Len)
 			name := trimNull(nameBytes)

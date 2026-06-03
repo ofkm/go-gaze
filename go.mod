@@ -1,5 +1,5 @@
 module go.ofkm.dev/gaze
 
-go 1.26.1
+go 1.26.3
 
 require golang.org/x/sys v0.42.0

@@ -7,18 +7,15 @@ weight: 2
 ## Constructors
 
 ```go
-func WatchDirectory(path string) (*Watcher, error)
-func WatchDirectoryWithConfig(path string, cfg types.Config) (*Watcher, error)
-func WatchFile(path string) (*Watcher, error)
-func WatchFileWithConfig(path string, cfg types.Config) (*Watcher, error)
-func New() (*Watcher, error)
-func NewWithConfig(cfg types.Config) (*Watcher, error)
+func New(cfg ...types.Config) (*Watcher, error)
+func WatchDirectory(path string, cfg ...types.Config) (*Watcher, error)
+func WatchFile(path string, cfg ...types.Config) (*Watcher, error)
 ```
 
-- `WatchDirectory` is the simplest way to watch a directory recursively.
-- `WatchDirectoryWithConfig` does the same thing with explicit configuration.
+- `WatchDirectory` watches a directory, recursively by default.
 - `WatchFile` watches one file by watching its parent directory.
-- `New` and `NewWithConfig` create an empty watcher so you can `Add` roots later.
+- `New` creates an empty watcher so you can `Add` roots later, or watch several roots from one watcher.
+- Each constructor takes an optional `types.Config`; omit it for defaults, and pass at most one.
 
 ## Watcher lifecycle
 
@@ -159,7 +156,7 @@ cfg := types.Config{
 	Logger: logger,
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 if err != nil {
 	panic(err)
 }

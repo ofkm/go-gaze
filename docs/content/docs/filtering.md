@@ -19,7 +19,7 @@ cfg := types.Config{
 	OnEvent: func(types.Event) {},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -39,7 +39,7 @@ cfg := types.Config{
 	OnEvent: func(types.Event) {},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -57,7 +57,7 @@ cfg := types.Config{
 	OnEvent: func(types.Event) {},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 if err != nil {
 	panic(err)
 }
@@ -75,7 +75,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 if err != nil {
 	panic(err)
 }

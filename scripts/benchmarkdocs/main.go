@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -127,10 +128,10 @@ func parseBenchmarkFile(path string) (benchmarkDoc, error) {
 	}
 
 	if doc.GOOS == "" || doc.GOARCH == "" {
-		return benchmarkDoc{}, fmt.Errorf("missing goos/goarch metadata")
+		return benchmarkDoc{}, errors.New("missing goos/goarch metadata")
 	}
 	if len(doc.Benchmarks) == 0 {
-		return benchmarkDoc{}, fmt.Errorf("no benchmark rows found")
+		return benchmarkDoc{}, errors.New("no benchmark rows found")
 	}
 
 	return doc, nil

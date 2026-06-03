@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.ofkm.dev/gaze/pkg/utils"
+	"go.ofkm.dev/gaze/internal/utils"
 )
 
 func TestIndexMatchesAndMovePrefix(t *testing.T) {

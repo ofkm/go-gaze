@@ -1,9 +1,10 @@
 package tree
 
 import (
+	"maps"
 	"sync"
 
-	"go.ofkm.dev/gaze/pkg/utils"
+	"go.ofkm.dev/gaze/internal/utils"
 )
 
 type Root struct {
@@ -76,9 +77,7 @@ func (i *Index) MovePrefix(oldPath, newPath string) {
 		if rootChanged {
 			if updated == nil {
 				updated = make(map[string]Root, len(i.roots))
-				for existingKey, existingRoot := range i.roots {
-					updated[existingKey] = existingRoot
-				}
+				maps.Copy(updated, i.roots)
 			}
 			delete(updated, key)
 			updated[root.Path] = root

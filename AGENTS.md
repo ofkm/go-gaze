@@ -9,8 +9,8 @@
 
 ## Architecture
 
-- The public API lives in the root `gaze` package. Start with `watcher.go`, `config.go`, `event.go`, and `doc.go` before changing behavior.
-- Keep public constructors thin. Shared setup should continue to flow through `NewWithConfig` and `newWatcher` instead of being duplicated.
+- The public API lives in the root `gaze` package. Start with `watcher.go`, `config.go`, `doc.go`, and `types/types.go` (event and config types) before changing behavior.
+- Keep public constructors thin. Shared setup should continue to flow through `New` and `newWatcher` instead of being duplicated.
 - OS-specific filesystem watching lives behind `internal/backend/backend.go`, with build-tagged implementations in `internal/backend/backend_*.go`.
 - Path filtering is centralized in `internal/filter`, watched-root matching and rename bookkeeping live in `internal/tree`, and event buffering/backpressure handling live in `internal/queue`.
 - Backend differences are real: platform-specific behavior is expected, especially around rename pairing and large recursive trees.
@@ -23,7 +23,7 @@
 - Use `log/slog` for logging-related behavior.
 - Remember the API semantics:
   - directory watches are recursive by default
-  - `WatchFile*` watches the parent directory and filters to the requested file
+  - `WatchFile` watches the parent directory and filters to the requested file
   - symlink roots require `FollowSymlinks: true`
   - overflow events must still be delivered when fidelity is lost
 - Avoid blocking callback paths unnecessarily; slow `OnEvent` handlers and small queues can cause backpressure.

@@ -25,13 +25,13 @@ func run(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	w, err := gaze.NewWithConfig(types.Config{
+	w, err := gaze.New(types.Config{
 		Exclude: func(info types.PathInfo) bool {
 			return info.IsDir && info.Base == ".git"
 		},
 		Ops: types.OpCreate | types.OpWrite | types.OpRemove | types.OpRename,
 		OnEvent: func(evt types.Event) {
-			fmt.Println(evt)
+			fmt.Fprintln(os.Stdout, evt)
 		},
 		OnError: func(err error) {
 			fmt.Fprintln(os.Stderr, "GAZE[ERROR]", err)
@@ -52,9 +52,9 @@ func run(args []string) int {
 		return 1
 	}
 
-	fmt.Printf("GAZE[WATCH] %s\n", args[0])
+	fmt.Fprintf(os.Stdout, "GAZE[WATCH] %s\n", args[0])
 
 	<-ctx.Done()
-	fmt.Println("GAZE[STOP] shutting down")
+	fmt.Fprintln(os.Stdout, "GAZE[STOP] shutting down")
 	return 0
 }

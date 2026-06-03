@@ -36,7 +36,7 @@ type Config struct {
 }
 
 type Watcher interface {
-	Add(Target) error
+	Add(target Target) error
 	Remove(path string) error
 	Events() <-chan Event
 	Errors() <-chan error

@@ -80,7 +80,7 @@ func cleanFast(path string) string {
 	if len(path) == 0 {
 		return filepath.Clean(path)
 	}
-	for i := 0; i < len(path); i++ {
+	for i := range len(path) {
 		c := path[i]
 		if c == '.' && (i == 0 || path[i-1] == filepath.Separator) {
 			if i+1 == len(path) || path[i+1] == filepath.Separator || path[i+1] == '.' {

@@ -549,35 +549,35 @@ func TestEmitErrorAndDispatchEventPanic(t *testing.T) {
 	}
 }
 
-func TestWatchDirectoryWithConfigAcceptsFilePath(t *testing.T) {
+func TestWatchDirectoryAcceptsFilePath(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "file.txt")
 	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	w, err := WatchDirectoryWithConfig(file, types.Config{})
+	w, err := WatchDirectory(file, types.Config{})
 	if err != nil {
-		t.Fatalf("WatchDirectoryWithConfig() error = %v", err)
+		t.Fatalf("WatchDirectory() error = %v", err)
 	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
 }
 
-func TestWatchFileWithConfigAcceptsDirectoryPath(t *testing.T) {
+func TestWatchFileAcceptsDirectoryPath(t *testing.T) {
 	dir := t.TempDir()
 
-	w, err := WatchFileWithConfig(dir, types.Config{})
+	w, err := WatchFile(dir, types.Config{})
 	if err != nil {
-		t.Fatalf("WatchFileWithConfig() error = %v", err)
+		t.Fatalf("WatchFile() error = %v", err)
 	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
 }
 
-func TestWatchDirectoryWithConfigFollowsDirectorySymlink(t *testing.T) {
+func TestWatchDirectoryFollowsDirectorySymlink(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "target")
 	link := filepath.Join(root, "link")
@@ -591,16 +591,16 @@ func TestWatchDirectoryWithConfigFollowsDirectorySymlink(t *testing.T) {
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
-	w, err := WatchDirectoryWithConfig(link, types.Config{FollowSymlinks: true})
+	w, err := WatchDirectory(link, types.Config{FollowSymlinks: true})
 	if err != nil {
-		t.Fatalf("WatchDirectoryWithConfig() error = %v", err)
+		t.Fatalf("WatchDirectory() error = %v", err)
 	}
 	if err := w.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
 }
 
-func TestWatchFileWithConfigBrokenSymlinkFails(t *testing.T) {
+func TestWatchFileBrokenSymlinkFails(t *testing.T) {
 	root := t.TempDir()
 	link := filepath.Join(root, "broken.txt")
 	if err := os.Symlink(filepath.Join(root, "missing.txt"), link); err != nil {
@@ -610,23 +610,23 @@ func TestWatchFileWithConfigBrokenSymlinkFails(t *testing.T) {
 		t.Fatalf("Symlink() error = %v", err)
 	}
 
-	w, err := WatchFileWithConfig(link, types.Config{FollowSymlinks: true})
+	w, err := WatchFile(link, types.Config{FollowSymlinks: true})
 	if err == nil {
 		if w != nil {
 			_ = w.Close()
 		}
-		t.Fatal("expected WatchFileWithConfig to reject a broken symlink")
+		t.Fatal("expected WatchFile to reject a broken symlink")
 	}
 }
 
-func TestNewWithConfigReturnsMatcherError(t *testing.T) {
-	_, err := NewWithConfig(types.Config{ExcludeGlobs: []string{"["}})
+func TestNewReturnsMatcherError(t *testing.T) {
+	_, err := New(types.Config{ExcludeGlobs: []string{"["}})
 	if err == nil {
 		t.Fatal("expected invalid glob to fail")
 	}
 }
 
-func TestNewWithConfigReturnsBackendError(t *testing.T) {
+func TestNewReturnsBackendError(t *testing.T) {
 	prev := newBackend
 	t.Cleanup(func() { newBackend = prev })
 
@@ -635,9 +635,9 @@ func TestNewWithConfigReturnsBackendError(t *testing.T) {
 		return nil, want
 	}
 
-	_, err := NewWithConfig(types.Config{})
+	_, err := New(types.Config{})
 	if !errors.Is(err, want) {
-		t.Fatalf("NewWithConfig() error = %v, want %v", err, want)
+		t.Fatalf("New() error = %v, want %v", err, want)
 	}
 }
 
@@ -647,15 +647,30 @@ func TestWatchConstructorsReturnNewWatcherErrors(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	if _, err := WatchDirectoryWithConfig(path, types.Config{ExcludeGlobs: []string{"["}}); err == nil {
-		t.Fatal("expected WatchDirectoryWithConfig to return constructor error")
+	if _, err := WatchDirectory(path, types.Config{ExcludeGlobs: []string{"["}}); err == nil {
+		t.Fatal("expected WatchDirectory to return constructor error")
 	}
-	if _, err := WatchFileWithConfig(path, types.Config{ExcludeGlobs: []string{"["}}); err == nil {
-		t.Fatal("expected WatchFileWithConfig to return constructor error")
+	if _, err := WatchFile(path, types.Config{ExcludeGlobs: []string{"["}}); err == nil {
+		t.Fatal("expected WatchFile to return constructor error")
 	}
 }
 
-func TestWatchDirectoryWithConfigJoinsAddAndCloseErrors(t *testing.T) {
+func TestConstructorsRejectMultipleConfigs(t *testing.T) {
+	dir := t.TempDir()
+	cfg := types.Config{}
+
+	if _, err := New(cfg, cfg); err == nil {
+		t.Fatal("New(cfg, cfg) error = nil, want error")
+	}
+	if _, err := WatchDirectory(dir, cfg, cfg); err == nil {
+		t.Fatal("WatchDirectory(dir, cfg, cfg) error = nil, want error")
+	}
+	if _, err := WatchFile(dir, cfg, cfg); err == nil {
+		t.Fatal("WatchFile(dir, cfg, cfg) error = nil, want error")
+	}
+}
+
+func TestWatchDirectoryJoinsAddAndCloseErrors(t *testing.T) {
 	prev := newBackend
 	t.Cleanup(func() { newBackend = prev })
 
@@ -673,13 +688,13 @@ func TestWatchDirectoryWithConfigJoinsAddAndCloseErrors(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	_, err := WatchDirectoryWithConfig(path, types.Config{})
+	_, err := WatchDirectory(path, types.Config{})
 	if err == nil || !errors.Is(err, addErr) || !errors.Is(err, closeErr) {
-		t.Fatalf("WatchDirectoryWithConfig() error = %v, want joined add+close error", err)
+		t.Fatalf("WatchDirectory() error = %v, want joined add+close error", err)
 	}
 }
 
-func TestWatchFileWithConfigJoinsAddAndCloseErrors(t *testing.T) {
+func TestWatchFileJoinsAddAndCloseErrors(t *testing.T) {
 	prev := newBackend
 	t.Cleanup(func() { newBackend = prev })
 
@@ -697,9 +712,9 @@ func TestWatchFileWithConfigJoinsAddAndCloseErrors(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 
-	_, err := WatchFileWithConfig(path, types.Config{})
+	_, err := WatchFile(path, types.Config{})
 	if err == nil || !errors.Is(err, addErr) || !errors.Is(err, closeErr) {
-		t.Fatalf("WatchFileWithConfig() error = %v, want joined add+close error", err)
+		t.Fatalf("WatchFile() error = %v, want joined add+close error", err)
 	}
 }
 
@@ -839,14 +854,14 @@ func TestNewWatcherExcludeCallbackUsesPathInfo(t *testing.T) {
 		return driver, nil
 	}
 
-	w, err := NewWithConfig(types.Config{
+	w, err := New(types.Config{
 		Exclude: func(info types.PathInfo) bool {
 			captured = info
 			return info.Base == "example.txt" && !info.IsDir
 		},
 	})
 	if err != nil {
-		t.Fatalf("NewWithConfig() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 	if captured.Path != filepath.Join(string(filepath.Separator), "tmp", "example.txt") || captured.Base != "example.txt" || captured.IsDir {
 		t.Fatalf("captured types.PathInfo = %+v", captured)
@@ -970,13 +985,13 @@ func TestNewAndWatchWrappers(t *testing.T) {
 		t.Fatalf("WatchFile().Close() error = %v", err)
 	}
 
-	if _, err := NewWithConfig(types.Config{ExcludeGlobs: []string{"["}}); err == nil {
-		t.Fatal("NewWithConfig(invalid glob) error = nil, want error")
+	if _, err := New(types.Config{ExcludeGlobs: []string{"["}}); err == nil {
+		t.Fatal("New(invalid glob) error = nil, want error")
 	}
-	if _, err := WatchDirectoryWithConfig(filepath.Join(root, "missing"), types.Config{}); err == nil {
-		t.Fatal("WatchDirectoryWithConfig(missing path) error = nil, want error")
+	if _, err := WatchDirectory(filepath.Join(root, "missing"), types.Config{}); err == nil {
+		t.Fatal("WatchDirectory(missing path) error = nil, want error")
 	}
-	if _, err := WatchFileWithConfig(filepath.Join(root, "missing.txt"), types.Config{}); err == nil {
-		t.Fatal("WatchFileWithConfig(missing path) error = nil, want error")
+	if _, err := WatchFile(filepath.Join(root, "missing.txt"), types.Config{}); err == nil {
+		t.Fatal("WatchFile(missing path) error = nil, want error")
 	}
 }

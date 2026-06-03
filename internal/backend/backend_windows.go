@@ -22,6 +22,11 @@ const windowsNotifyMask = windows.FILE_NOTIFY_CHANGE_FILE_NAME |
 	windows.FILE_NOTIFY_CHANGE_CREATION |
 	windows.FILE_NOTIFY_CHANGE_SECURITY
 
+// windowsFileNotifyHeaderSize is the size of the fixed fields of
+// FILE_NOTIFY_INFORMATION (NextEntryOffset, Action, FileNameLength) that
+// precede the variable-length FileName. Used to bounds-check buffer parsing.
+const windowsFileNotifyHeaderSize = uint64(unsafe.Offsetof(windows.FileNotifyInformation{}.FileName))
+
 type windowsWatcher struct {
 	cfg Config
 
@@ -162,9 +167,26 @@ func (w *windowsWatcher) runRoot(root *windowsRoot) {
 			return
 		}
 
-		offset := uint32(0)
+		if bytes == 0 {
+			// A successful read of zero bytes means the kernel dropped changes
+			// because the notification buffer overflowed. Surface the lost
+			// fidelity as OpOverflow; parsing buf here would re-read stale data
+			// from the previous iteration.
+			w.emitEvent(Event{Op: OpOverflow})
+			continue
+		}
+
+		offset := uint64(0)
 		for {
+			// Bound every read by the bytes the kernel actually wrote so a
+			// truncated or malformed entry cannot index past valid data.
+			if offset+windowsFileNotifyHeaderSize > uint64(bytes) {
+				break
+			}
 			info := (*windows.FileNotifyInformation)(unsafe.Pointer(&buf[offset]))
+			if offset+windowsFileNotifyHeaderSize+uint64(info.FileNameLength) > uint64(bytes) {
+				break
+			}
 			nameLen := info.FileNameLength / 2
 			nameSlice := unsafe.Slice((*uint16)(unsafe.Pointer(&info.FileName)), nameLen)
 			name := string(utf16.Decode(nameSlice))
@@ -192,7 +214,7 @@ func (w *windowsWatcher) runRoot(root *windowsRoot) {
 			if info.NextEntryOffset == 0 {
 				break
 			}
-			offset += info.NextEntryOffset
+			offset += uint64(info.NextEntryOffset)
 		}
 	}
 }

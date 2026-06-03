@@ -24,7 +24,7 @@ cfg := types.Config{
 	},
 }
 
-w, err := gaze.WatchDirectoryWithConfig("my-directory", cfg)
+w, err := gaze.WatchDirectory("my-directory", cfg)
 ```
 
 A few things to know up front:

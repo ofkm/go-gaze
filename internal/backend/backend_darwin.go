@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"go.ofkm.dev/gaze/pkg/utils"
+	"go.ofkm.dev/gaze/internal/utils"
 	"golang.org/x/sys/unix"
 )
 
@@ -277,7 +277,9 @@ func (w *darwinWatcher) enrollDirectoryTarget(target Target) error {
 }
 
 func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
-	if w.cfg.ShouldExclude != nil && w.cfg.ShouldExclude(path, isDir) && path != w.roots[root].Path {
+	// rootTarget reads w.roots under the lock; indexing w.roots directly here
+	// would race with concurrent Add/Remove mutating the map.
+	if w.cfg.ShouldExclude != nil && w.cfg.ShouldExclude(path, isDir) && path != w.rootTarget(root).Path {
 		return nil
 	}
 
@@ -422,7 +424,7 @@ func (w *darwinWatcher) emitRenamesFromDiff(pathPrefix string, removed, added ma
 func (w *darwinWatcher) emitRemovesFromDiff(pathPrefix string, removed map[string]entryMeta) {
 	for name, meta := range removed {
 		child := pathPrefix + name
-		removedWatch := false
+		var removedWatch bool
 		if meta.isDir {
 			removedWatch = w.removePrefixIfWatched(child)
 		} else {
