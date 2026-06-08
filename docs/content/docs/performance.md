@@ -21,41 +21,41 @@ CPU: `Apple M1 (Virtual)`
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `BenchmarkWatchDirectoryCreateRemove` | `269889 ns/op` | `3389 B/op` | `25 allocs/op` |
-| `BenchmarkOpString` | `0.3734 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkFilterShouldExclude` | `435.7 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMatches` | `74.71 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMatchesDeepPath` | `118.2 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkFilterShouldExcludeDeepPath` | `626.5 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMovePrefix` | `723.9 ns/op` | `944 B/op` | `7 allocs/op` |
+| `BenchmarkWatchDirectoryCreateRemove` | `108076 ns/op` | `3950 B/op` | `29 allocs/op` |
+| `BenchmarkOpString` | `0.3195 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkFilterShouldExclude` | `367.7 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMatches` | `62.75 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMatchesDeepPath` | `99.63 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkFilterShouldExcludeDeepPath` | `537.9 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMovePrefix` | `348.6 ns/op` | `944 B/op` | `7 allocs/op` |
 
 ### `linux/amd64`
 
-CPU: `AMD EPYC 7763 64-Core Processor`
+CPU: `AMD EPYC 9V74 80-Core Processor`
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `BenchmarkWatchDirectoryCreateRemove` | `93669 ns/op` | `642 B/op` | `11 allocs/op` |
-| `BenchmarkOpString` | `0.3121 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkFilterShouldExclude` | `487.1 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMatches` | `81.37 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMatchesDeepPath` | `122.7 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkFilterShouldExcludeDeepPath` | `712.1 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMovePrefix` | `482.1 ns/op` | `944 B/op` | `7 allocs/op` |
+| `BenchmarkWatchDirectoryCreateRemove` | `72251 ns/op` | `644 B/op` | `11 allocs/op` |
+| `BenchmarkOpString` | `0.3523 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkFilterShouldExclude` | `500.7 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMatches` | `76.57 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMatchesDeepPath` | `121.1 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkFilterShouldExcludeDeepPath` | `731.0 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMovePrefix` | `484.8 ns/op` | `944 B/op` | `7 allocs/op` |
 
 ### `windows/amd64`
 
-CPU: `AMD EPYC 7763 64-Core Processor`
+CPU: `AMD EPYC 9V74 80-Core Processor`
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --- | ---: | ---: | ---: |
-| `BenchmarkWatchDirectoryCreateRemove` | `643003 ns/op` | `1713 B/op` | `12 allocs/op` |
-| `BenchmarkOpString` | `0.3176 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkFilterShouldExclude` | `1871 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMatches` | `82.42 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMatchesDeepPath` | `93.28 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkFilterShouldExcludeDeepPath` | `4774 ns/op` | `0 B/op` | `0 allocs/op` |
-| `BenchmarkTreeMovePrefix` | `694.6 ns/op` | `944 B/op` | `7 allocs/op` |
+| `BenchmarkWatchDirectoryCreateRemove` | `633643 ns/op` | `1503 B/op` | `11 allocs/op` |
+| `BenchmarkOpString` | `0.3636 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkFilterShouldExclude` | `2007 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMatches` | `85.08 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMatchesDeepPath` | `98.44 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkFilterShouldExcludeDeepPath` | `5281 ns/op` | `0 B/op` | `0 allocs/op` |
+| `BenchmarkTreeMovePrefix` | `731.0 ns/op` | `944 B/op` | `7 allocs/op` |
 
 How to read this page:
 
