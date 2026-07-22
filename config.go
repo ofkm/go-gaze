@@ -3,23 +3,21 @@ package gaze
 import (
 	"errors"
 	"log/slog"
-
-	"go.ofkm.dev/gaze/types"
 )
 
 // ErrWatcherClosed is returned by [Watcher.Add] and [Watcher.Remove] when they
 // are called after [Watcher.Close]. Test for it with errors.Is.
 var ErrWatcherClosed = errors.New("gaze: watcher closed")
 
-func defaultConfig() types.Config {
-	return types.Config{
+func defaultConfig() Config {
+	return Config{
 		Logger:        slog.Default(),
-		Ops:           types.AllOps,
+		Ops:           AllOps,
 		QueueCapacity: 1024,
 	}
 }
 
-func resolveConfig(override types.Config) types.Config {
+func resolveConfig(override Config) Config {
 	cfg := defaultConfig()
 	cfg.Recursion = override.Recursion
 	cfg.ExcludeGlobs = override.ExcludeGlobs
@@ -32,9 +30,9 @@ func resolveConfig(override types.Config) types.Config {
 	cfg.QueueCapacity = override.QueueCapacity
 	cfg.FollowSymlinks = override.FollowSymlinks
 	if cfg.Ops == 0 {
-		cfg.Ops = types.AllOps
+		cfg.Ops = AllOps
 	} else {
-		cfg.Ops |= types.OpOverflow
+		cfg.Ops |= OpOverflow
 	}
 	if cfg.QueueCapacity <= 0 {
 		cfg.QueueCapacity = defaultConfig().QueueCapacity
@@ -46,13 +44,13 @@ func resolveConfig(override types.Config) types.Config {
 	return cfg
 }
 
-func recursiveEnabled(cfg types.Config, defaultValue bool) bool {
+func recursiveEnabled(cfg Config, defaultValue bool) bool {
 	switch cfg.Recursion {
-	case types.RecursionEnabled:
+	case RecursionEnabled:
 		return true
-	case types.RecursionDisabled:
+	case RecursionDisabled:
 		return false
-	case types.RecursionDefault:
+	case RecursionDefault:
 		return defaultValue
 	default:
 		return defaultValue

@@ -8,25 +8,32 @@
 //	}
 //	defer w.Close()
 //
-// To add filters, callbacks, or a logger, pass a [types.Config]:
+// To add filters, callbacks, or a logger, define a [Config] once and reuse it
+// for as many watchers as you need:
 //
-//	cfg := types.Config{
+//	cfg := gaze.Config{
 //		ExcludeGlobs: []string{"*.tmp"},
-//		OnEvent: func(evt types.Event) {
+//		OnEvent: func(evt gaze.Event) {
 //			fmt.Println(evt)
 //		},
 //	}
 //
-//	w, err := gaze.WatchDirectory("my-directory", cfg)
+//	w1, err := cfg.WatchDirectory("my-directory")
+//	w2, err := cfg.WatchFile("app.log")
 //
 // # Choosing a constructor
 //
-//   - [WatchDirectory] watches one directory, recursively by default.
-//   - [WatchFile] watches one file (through its parent directory).
-//   - [New] starts empty; enroll roots later with [Watcher.Add], or watch
-//     several roots from a single Watcher.
+//   - [WatchDirectory] / [Config.WatchDirectory] watch one directory,
+//     recursively by default.
+//   - [WatchFile] / [Config.WatchFile] watch one file (through its parent
+//     directory).
+//   - [New] / [Config.NewWatcher] start empty; enroll roots later with
+//     [Watcher.Add], or watch several roots from a single Watcher.
 //
-// Every constructor takes an optional [types.Config]; omit it for defaults.
+// Every package-level constructor takes an optional [Config]; omit it for
+// defaults. The types formerly in the types subpackage (Config, Event, Op,
+// PathInfo, RecursionMode) now live in this package; go.ofkm.dev/gaze/types
+// remains as a compatibility alias shim.
 //
 // # Choosing how to exclude paths
 //

@@ -14,8 +14,12 @@ type Config struct {
 
 type Matcher struct {
 	prefixes []string
-	globs    []string
-	exclude  func(path string, isDir bool) bool
+	// baseGlobs are matched against the path's base name only; pathGlobs are
+	// matched against the slash-separated path only. Splitting at construction
+	// halves filepath.Match calls in the ShouldExclude hot path.
+	baseGlobs []string
+	pathGlobs []string
+	exclude   func(path string, isDir bool) bool
 }
 
 func New(cfg Config) (*Matcher, error) {
@@ -27,7 +31,7 @@ func New(cfg Config) (*Matcher, error) {
 		prefixes = append(prefixes, filepath.Clean(prefix))
 	}
 
-	globs := make([]string, 0, len(cfg.Globs))
+	var baseGlobs, pathGlobs []string
 	for _, glob := range cfg.Globs {
 		if strings.TrimSpace(glob) == "" {
 			continue
@@ -35,18 +39,30 @@ func New(cfg Config) (*Matcher, error) {
 		if _, err := filepath.Match(glob, "probe"); err != nil {
 			return nil, fmt.Errorf("gaze: invalid exclude glob %q: %w", glob, err)
 		}
-		globs = append(globs, glob)
+		if strings.ContainsRune(glob, '/') || strings.ContainsRune(glob, filepath.Separator) {
+			// A pattern with a separator can never match a bare base name.
+			pathGlobs = append(pathGlobs, glob)
+			continue
+		}
+		baseGlobs = append(baseGlobs, glob)
+		if filepath.Separator != '/' {
+			// On Windows, '/' is an ordinary character to filepath.Match, so a
+			// separator-free pattern can still match a slashed path. Keep
+			// matching it both ways to preserve semantics.
+			pathGlobs = append(pathGlobs, glob)
+		}
 	}
 
 	return &Matcher{
-		prefixes: prefixes,
-		globs:    globs,
-		exclude:  cfg.Exclude,
+		prefixes:  prefixes,
+		baseGlobs: baseGlobs,
+		pathGlobs: pathGlobs,
+		exclude:   cfg.Exclude,
 	}, nil
 }
 
 func (m *Matcher) ShouldExclude(path string, isDir bool) bool {
-	if len(m.prefixes) == 0 && len(m.globs) == 0 && m.exclude == nil {
+	if len(m.prefixes) == 0 && len(m.baseGlobs) == 0 && len(m.pathGlobs) == 0 && m.exclude == nil {
 		return false
 	}
 
@@ -58,13 +74,17 @@ func (m *Matcher) ShouldExclude(path string, isDir bool) bool {
 		}
 	}
 
-	if len(m.globs) > 0 {
+	if len(m.baseGlobs) > 0 {
 		base := baseFast(path)
-		slashed := toSlashFast(path)
-		for _, glob := range m.globs {
+		for _, glob := range m.baseGlobs {
 			if ok, _ := filepath.Match(glob, base); ok {
 				return true
 			}
+		}
+	}
+	if len(m.pathGlobs) > 0 {
+		slashed := toSlashFast(path)
+		for _, glob := range m.pathGlobs {
 			if ok, _ := filepath.Match(glob, slashed); ok {
 				return true
 			}

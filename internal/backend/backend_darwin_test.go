@@ -1080,3 +1080,39 @@ func TestDarwinWatcherAddRecursiveDirectorySkipsExcludedEntries(t *testing.T) {
 		t.Fatal("did not expect excluded directory to be watched")
 	}
 }
+
+func TestDarwinAddPathAfterRootRemoved(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	file := filepath.Join(dir, "file.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	wi, err := New(Config{BufferSize: 8})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	w := wi.(*darwinWatcher)
+	t.Cleanup(func() { _ = w.Close() })
+
+	if err := w.Add(Target{Path: dir, WatchPath: dir, IsDir: true, Recursive: true}); err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if err := w.Remove(dir); err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+
+	// Regression: enrolling a path for a removed root used to panic with
+	// "assignment to entry in nil map".
+	if err := w.addPath(dir, file, false); err != nil {
+		t.Fatalf("addPath() after root removal error = %v", err)
+	}
+	w.mu.Lock()
+	_, watched := w.watched[file]
+	w.mu.Unlock()
+	if watched {
+		t.Fatal("path enrolled for a removed root")
+	}
+}

@@ -158,9 +158,14 @@ func (w *linuxWatcher) addDir(root, dir string) error {
 	if w.closed {
 		return os.ErrClosed
 	}
+	dirs, ok := w.rootDirs[root]
+	if !ok {
+		// The root was removed while this enrollment was in flight.
+		return nil
+	}
 	if node := w.watched[dir]; node != nil {
 		node.roots[root] = struct{}{}
-		w.rootDirs[root][dir] = struct{}{}
+		dirs[dir] = struct{}{}
 		return nil
 	}
 
@@ -174,7 +179,7 @@ func (w *linuxWatcher) addDir(root, dir string) error {
 		roots: map[string]struct{}{root: {}},
 	}
 	w.wdToPath[wd] = dir
-	w.rootDirs[root][dir] = struct{}{}
+	dirs[dir] = struct{}{}
 	return nil
 }
 
@@ -357,22 +362,26 @@ func (w *linuxWatcher) renameWatchedPrefix(oldPrefix, newPrefix string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	updated := make(map[string]*linuxNode, len(w.watched))
-	for path, node := range w.watched {
+	var moved []string
+	for path := range w.watched {
 		if utils.HasPathPrefix(path, oldPrefix) {
-			newPath := utils.JoinMovedPath(path, oldPrefix, newPrefix)
-			node.path = newPath
-			updated[newPath] = node
-			w.wdToPath[node.wd] = newPath
-			for root := range node.roots {
-				delete(w.rootDirs[root], path)
-				w.rootDirs[root][newPath] = struct{}{}
-			}
-			continue
+			moved = append(moved, path)
 		}
-		updated[path] = node
 	}
-	w.watched = updated
+	for _, path := range moved {
+		node := w.watched[path]
+		newPath := utils.JoinMovedPath(path, oldPrefix, newPrefix)
+		node.path = newPath
+		delete(w.watched, path)
+		w.watched[newPath] = node
+		w.wdToPath[node.wd] = newPath
+		for root := range node.roots {
+			delete(w.rootDirs[root], path)
+			if dirs, ok := w.rootDirs[root]; ok {
+				dirs[newPath] = struct{}{}
+			}
+		}
+	}
 }
 
 func (w *linuxWatcher) dropWatch(wd int32, path string) {

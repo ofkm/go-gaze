@@ -110,3 +110,39 @@ func ExampleNew() {
 		panic(err)
 	}
 }
+
+// ExampleConfig_WatchDirectory defines one Config and reuses it to create
+// several independent watchers.
+func ExampleConfig_WatchDirectory() {
+	dirA, err := os.MkdirTemp("", "gaze-example-a-*")
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = os.RemoveAll(dirA) }()
+	dirB, err := os.MkdirTemp("", "gaze-example-b-*")
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = os.RemoveAll(dirB) }()
+
+	cfg := gaze.Config{
+		ExcludeGlobs: []string{"*.tmp"},
+		OnEvent: func(evt gaze.Event) {
+			fmt.Println(evt)
+		},
+	}
+
+	w1, err := cfg.WatchDirectory(dirA)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = w1.Close() }()
+
+	w2, err := cfg.WatchDirectory(dirB)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = w2.Close() }()
+
+	// Output:
+}

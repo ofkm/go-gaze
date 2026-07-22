@@ -14,7 +14,6 @@ import (
 	"go.ofkm.dev/gaze/internal/filter"
 	"go.ofkm.dev/gaze/internal/queue"
 	"go.ofkm.dev/gaze/internal/tree"
-	"go.ofkm.dev/gaze/types"
 )
 
 var (
@@ -23,56 +22,89 @@ var (
 )
 
 // Watcher observes one or more filesystem roots and delivers normalized
-// [types.Event] values to the callbacks configured in its [types.Config].
+// [Event] values to the callbacks configured in its [Config].
 //
 // A Watcher owns its goroutines and must be released with [Watcher.Close]. Its
 // methods are safe to call from multiple goroutines. Event and error callbacks
-// run on goroutines owned by the Watcher, not the caller's (see [types.Config]).
+// run on goroutines owned by the Watcher, not the caller's (see [Config]).
 //
 // The zero value is not usable; obtain a Watcher from [New], [WatchDirectory],
 // or [WatchFile].
 type Watcher struct {
-	cfg     types.Config
+	cfg     Config
 	matcher *filter.Matcher
 	index   *tree.Index
 	driver  backend.Watcher
-	queue   *queue.Queue[types.Event]
+	queue   *queue.Queue[Event]
 	logger  *slog.Logger
 
-	closeOnce sync.Once
-	closeErr  error
-	closed    atomic.Bool
-	done      chan struct{}
+	closeOnce   sync.Once
+	closeErr    error
+	closed      atomic.Bool
+	backendDone chan struct{}
+	done        chan struct{}
 }
 
 // New creates an empty Watcher with no roots; call [Watcher.Add] to enroll
 // paths. With no argument it uses default configuration; pass a single
-// [types.Config] to customize. Passing more than one Config is an error.
+// [Config] to customize. Passing more than one Config is an error.
 //
 // For the common single-root case, prefer [WatchDirectory] or [WatchFile].
-func New(cfg ...types.Config) (*Watcher, error) {
+func New(cfg ...Config) (*Watcher, error) {
 	c, err := pickConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
+	return c.NewWatcher()
+}
+
+// NewWatcher creates an empty Watcher configured by c; call [Watcher.Add] to
+// enroll paths. The receiver is copied, so one Config value can be reused to
+// create any number of independent watchers.
+func (c Config) NewWatcher() (*Watcher, error) {
 	return newWatcher(resolveConfig(c))
+}
+
+// WatchDirectory creates a Watcher configured by c and starts watching path.
+// It behaves exactly like the package-level [WatchDirectory]; the receiver is
+// copied, so c can be reused for further watchers.
+func (c Config) WatchDirectory(path string) (*Watcher, error) {
+	w, err := c.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+	return watchRoot(w, path)
+}
+
+// WatchFile creates a Watcher configured by c and starts watching the single
+// file at path. It behaves exactly like the package-level [WatchFile]; the
+// receiver is copied, so c can be reused for further watchers.
+func (c Config) WatchFile(path string) (*Watcher, error) {
+	rc := resolveConfig(c)
+	rc.Recursion = RecursionDisabled
+
+	w, err := newWatcher(rc)
+	if err != nil {
+		return nil, err
+	}
+	return watchRoot(w, path)
 }
 
 // WatchDirectory creates a Watcher and starts watching path, normally a
 // directory. Directories are watched recursively by default; set
-// Config.Recursion to [types.RecursionDisabled] to watch only the top level.
-// With no argument it uses defaults; pass a single [types.Config] to customize.
+// Config.Recursion to [RecursionDisabled] to watch only the top level.
+// With no argument it uses defaults; pass a single [Config] to customize.
 // Passing more than one Config is an error.
 //
 // path is normalized to an absolute path. It may also name a file, in which
 // case it behaves like [WatchFile], though WatchFile states that intent more
 // clearly.
-func WatchDirectory(path string, cfg ...types.Config) (*Watcher, error) {
-	w, err := New(cfg...)
+func WatchDirectory(path string, cfg ...Config) (*Watcher, error) {
+	c, err := pickConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return watchRoot(w, path)
+	return c.WatchDirectory(path)
 }
 
 // WatchFile creates a Watcher and starts watching the single file at path.
@@ -80,33 +112,26 @@ func WatchDirectory(path string, cfg ...types.Config) (*Watcher, error) {
 // Gaze does not watch the file inode directly: it watches the file's parent
 // directory non-recursively and delivers only events for path. Recursion is
 // forced off regardless of Config. With no argument it uses defaults; pass a
-// single [types.Config] to customize. Passing more than one Config is an error.
-func WatchFile(path string, cfg ...types.Config) (*Watcher, error) {
+// single [Config] to customize. Passing more than one Config is an error.
+func WatchFile(path string, cfg ...Config) (*Watcher, error) {
 	c, err := pickConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
-	c = resolveConfig(c)
-	c.Recursion = types.RecursionDisabled
-
-	w, err := newWatcher(c)
-	if err != nil {
-		return nil, err
-	}
-	return watchRoot(w, path)
+	return c.WatchFile(path)
 }
 
 // pickConfig returns the single optional Config, or the zero Config when none
 // is supplied. More than one Config is rejected so a mistaken extra argument is
 // never silently dropped.
-func pickConfig(cfg []types.Config) (types.Config, error) {
+func pickConfig(cfg []Config) (Config, error) {
 	switch len(cfg) {
 	case 0:
-		return types.Config{}, nil
+		return Config{}, nil
 	case 1:
 		return cfg[0], nil
 	default:
-		return types.Config{}, errors.New("gaze: at most one Config may be provided")
+		return Config{}, errors.New("gaze: at most one Config may be provided")
 	}
 }
 
@@ -122,11 +147,11 @@ func watchRoot(w *Watcher, path string) (*Watcher, error) {
 	return w, nil
 }
 
-func newWatcher(cfg types.Config) (*Watcher, error) {
+func newWatcher(cfg Config) (*Watcher, error) {
 	var exclude func(string, bool) bool
 	if cfg.Exclude != nil {
 		exclude = func(path string, isDir bool) bool {
-			return cfg.Exclude(types.PathInfo{
+			return cfg.Exclude(PathInfo{
 				Path:  path,
 				Base:  filepath.Base(path),
 				IsDir: isDir,
@@ -160,9 +185,11 @@ func newWatcher(cfg types.Config) (*Watcher, error) {
 		matcher: matcher,
 		index:   tree.New(),
 		driver:  driver,
-		queue:   queue.New[types.Event](cfg.QueueCapacity),
+		queue:   queue.New[Event](cfg.QueueCapacity),
 		logger:  cfg.Logger,
 		done:    make(chan struct{}),
+
+		backendDone: make(chan struct{}),
 	}
 
 	go w.runBackend()
@@ -250,24 +277,31 @@ func (w *Watcher) Close() error {
 	w.closeOnce.Do(func() {
 		w.closed.Store(true)
 		w.closeErr = w.driver.Close()
-		w.queue.Close()
+		<-w.backendDone
 		<-w.done
 	})
 	return w.closeErr
 }
 
 func (w *Watcher) runBackend() {
+	defer close(w.backendDone)
 	defer w.queue.Close()
-	for {
+
+	// Drain both channels fully: backends close events and errors together, and
+	// returning on the first closed channel would drop buffered events.
+	evCh, errCh := w.driver.Events(), w.driver.Errors()
+	for evCh != nil || errCh != nil {
 		select {
-		case evt, ok := <-w.driver.Events():
+		case evt, ok := <-evCh:
 			if !ok {
-				return
+				evCh = nil
+				continue
 			}
 			w.handleBackendEvent(evt)
-		case err, ok := <-w.driver.Errors():
+		case err, ok := <-errCh:
 			if !ok {
-				return
+				errCh = nil
+				continue
 			}
 			w.emitError(err)
 		}
@@ -289,7 +323,7 @@ func (w *Watcher) runEvents() {
 }
 
 func (w *Watcher) handleBackendEvent(evt backend.Event) {
-	publicOp := types.Op(evt.Op)
+	publicOp := Op(evt.Op)
 
 	if evt.Op.Has(backend.OpRename) && evt.Path != "" && evt.OldPath != "" {
 		w.index.MovePrefix(evt.OldPath, evt.Path)
@@ -301,11 +335,11 @@ func (w *Watcher) handleBackendEvent(evt backend.Event) {
 		}
 	}
 
-	if publicOp != types.OpOverflow && !w.cfg.Ops.Has(publicOp) {
+	if publicOp != OpOverflow && !w.cfg.Ops.Has(publicOp) {
 		return
 	}
 
-	public := types.Event{
+	public := Event{
 		Path:    evt.Path,
 		OldPath: evt.OldPath,
 		Op:      publicOp,
@@ -335,7 +369,7 @@ func (w *Watcher) emitError(err error) {
 	}
 }
 
-func (w *Watcher) dispatchEvent(evt types.Event) {
+func (w *Watcher) dispatchEvent(evt Event) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			w.emitError(fmt.Errorf("gaze: event handler panic: %v", recovered))

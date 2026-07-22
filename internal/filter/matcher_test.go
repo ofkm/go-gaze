@@ -137,3 +137,27 @@ func TestMatcherShouldExcludeSlashedGlob(t *testing.T) {
 		t.Fatal("expected slashed glob to match cleaned path")
 	}
 }
+
+func TestMatcherGlobSplitBehavior(t *testing.T) {
+	m, err := New(Config{Globs: []string{"*.tmp", "nested/*.log"}})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{filepath.Join(string(filepath.Separator), "a", "b", "x.tmp"), true}, // base glob on deep path
+		{"x.tmp", true}, // base glob on bare name
+		{filepath.Join("nested", "file.log"), true},       // path glob
+		{filepath.Join("other", "file.log"), false},       // path glob wrong dir
+		{filepath.Join("nested", "deep", "f.log"), false}, // * does not cross separators
+		{filepath.Join("nested", "x.tmp"), true},          // base glob inside dir
+	}
+	for _, tc := range cases {
+		if got := m.ShouldExclude(tc.path, false); got != tc.want {
+			t.Errorf("ShouldExclude(%q) = %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}

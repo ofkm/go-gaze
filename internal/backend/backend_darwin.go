@@ -284,11 +284,17 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 	}
 
 	w.mu.Lock()
+	nodes, rootOK := w.rootNodes[root]
+	if !rootOK {
+		// The root was removed while this enrollment was in flight.
+		w.mu.Unlock()
+		return nil
+	}
 	if node := w.watched[path]; node != nil {
 		if !slices.Contains(node.roots, root) {
 			node.roots = append(node.roots, root)
 		}
-		w.rootNodes[root][path] = struct{}{}
+		nodes[path] = struct{}{}
 		w.mu.Unlock()
 		return nil
 	}
@@ -318,12 +324,18 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 		_ = darwinClose(fd)
 		return os.ErrClosed
 	}
+	nodes, rootOK = w.rootNodes[root]
+	if !rootOK {
+		// The root was removed while the fd was being opened and registered.
+		_ = darwinClose(fd)
+		return nil
+	}
 	if node := w.watched[path]; node != nil {
 		_ = darwinClose(fd)
 		if !slices.Contains(node.roots, root) {
 			node.roots = append(node.roots, root)
 		}
-		w.rootNodes[root][path] = struct{}{}
+		nodes[path] = struct{}{}
 		return nil
 	}
 
@@ -334,7 +346,7 @@ func (w *darwinWatcher) addPath(root, path string, isDir bool) error {
 		roots: []string{root},
 	}
 	w.fdToPath[darwinFDKey(fd)] = path
-	w.rootNodes[root][path] = struct{}{}
+	nodes[path] = struct{}{}
 	if isDir {
 		w.snapshots[path] = w.readDirSnapshot(path)
 	}
